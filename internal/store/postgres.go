@@ -54,7 +54,10 @@ func NewPostgresStore(dsn string) (*PostgresStore, error) {
 		id SERIAL PRIMARY KEY,
 		username TEXT UNIQUE,
 		password TEXT,
-		created_at TIMESTAMP WITH TIME ZONE
+		role TEXT DEFAULT 'user',
+		status TEXT DEFAULT 'active',
+		created_at TIMESTAMP WITH TIME ZONE,
+		updated_at TIMESTAMP WITH TIME ZONE
 	);
 	-- Insert default public namespace if not exists
 	INSERT INTO namespaces (name) VALUES ('public') ON CONFLICT DO NOTHING;
@@ -68,23 +71,54 @@ func NewPostgresStore(dsn string) (*PostgresStore, error) {
 
 // ... (existing methods) ...
 func (s *PostgresStore) CreateUser(ctx context.Context, user *model.User) error {
-	query := `INSERT INTO users (username, password, created_at) VALUES ($1, $2, $3)`
-	_, err := s.db.ExecContext(ctx, query, user.Username, user.Password, user.CreatedAt)
+	query := `INSERT INTO users (username, password, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)`
+	_, err := s.db.ExecContext(ctx, query, user.Username, user.Password, user.Role, user.Status, user.CreatedAt, user.UpdatedAt)
 	return err
 }
 
 func (s *PostgresStore) GetUser(ctx context.Context, username string) (*model.User, error) {
-	query := `SELECT id, username, password, created_at FROM users WHERE username = $1`
+	query := `SELECT id, username, password, role, status, created_at, updated_at FROM users WHERE username = $1`
 	row := s.db.QueryRowContext(ctx, query, username)
 
 	var u model.User
-	if err := row.Scan(&u.ID, &u.Username, &u.Password, &u.CreatedAt); err != nil {
+	if err := row.Scan(&u.ID, &u.Username, &u.Password, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
 	return &u, nil
+}
+
+func (s *PostgresStore) ListUsers(ctx context.Context) ([]*model.User, error) {
+	query := `SELECT id, username, password, role, status, created_at, updated_at FROM users ORDER BY username`
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*model.User
+	for rows.Next() {
+		var u model.User
+		if err := rows.Scan(&u.ID, &u.Username, &u.Password, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, &u)
+	}
+	return users, nil
+}
+
+func (s *PostgresStore) UpdateUser(ctx context.Context, user *model.User) error {
+	query := `UPDATE users SET password = $1, role = $2, status = $3, updated_at = $4 WHERE username = $5`
+	_, err := s.db.ExecContext(ctx, query, user.Password, user.Role, user.Status, user.UpdatedAt, user.Username)
+	return err
+}
+
+func (s *PostgresStore) DeleteUser(ctx context.Context, username string) error {
+	query := `DELETE FROM users WHERE username = $1`
+	_, err := s.db.ExecContext(ctx, query, username)
+	return err
 }
 
 func (s *PostgresStore) Get(ctx context.Context, namespace, group, key string) (*model.Config, error) {

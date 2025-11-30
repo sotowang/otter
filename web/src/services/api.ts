@@ -1,4 +1,4 @@
-import type { Config, ConfigHistory } from '../types';
+import type { Config, ConfigHistory, User } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -211,6 +211,62 @@ export const namespaceAPI = {
   // 删除命名空间
   deleteNamespace: async (name: string): Promise<void> => {
     const response = await fetch(`${API_BASE}/namespaces/${name}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+
+    return handleResponse<void>(response);
+  },
+};
+
+// 用户管理API
+export const userAPI = {
+  // 加载用户列表
+  loadUsers: async (): Promise<User[]> => {
+    const response = await fetch(`${API_BASE}/users`, {
+      headers: getHeaders(),
+    });
+
+    return handleResponse<User[]>(response);
+  },
+
+  // 创建用户
+  createUser: async (user: {
+    username: string;
+    password: string;
+    role: 'admin' | 'user';
+    status: 'active' | 'inactive';
+  }): Promise<User> => {
+    const response = await fetch(`${API_BASE}/users`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(user),
+    });
+
+    return handleResponse<User>(response);
+  },
+
+  // 更新用户
+  updateUser: async (
+    username: string,
+    user: {
+      password?: string;
+      role: 'admin' | 'user';
+      status: 'active' | 'inactive';
+    }
+  ): Promise<User> => {
+    const response = await fetch(`${API_BASE}/users/${username}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(user),
+    });
+
+    return handleResponse<User>(response);
+  },
+
+  // 删除用户
+  deleteUser: async (username: string): Promise<void> => {
+    const response = await fetch(`${API_BASE}/users/${username}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });

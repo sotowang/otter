@@ -8,6 +8,7 @@ const ConfigManagement = React.lazy(() => import('./pages/ConfigManagement'));
 const NamespaceManagement = React.lazy(
   () => import('./pages/NamespaceManagement')
 );
+const UserManagement = React.lazy(() => import('./pages/UserManagement'));
 
 const App: React.FC = () => {
   const { isAuthenticated, isLoading, username, logout } = useAuth();
@@ -131,6 +132,19 @@ const App: React.FC = () => {
                 <span className="nav-text">Namespace Management</span>
               </a>
             </li>
+            <li className="nav-item">
+              <a
+                href="#"
+                className={`nav-link ${activePage === 'user-management' ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNavClick('user-management');
+                }}
+              >
+                <span className="nav-icon">👥</span>
+                <span className="nav-text">User Management</span>
+              </a>
+            </li>
           </ul>
         </nav>
 
@@ -150,6 +164,7 @@ const App: React.FC = () => {
           {/* Page Content */}
           {activePage === 'config-management' && <ConfigManagement />}
           {activePage === 'namespace-management' && <NamespaceManagement />}
+          {activePage === 'user-management' && <UserManagement />}
         </div>
       </div>
     </Suspense>

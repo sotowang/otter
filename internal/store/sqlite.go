@@ -54,7 +54,10 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		username TEXT UNIQUE,
 		password TEXT,
-		created_at DATETIME
+		role TEXT DEFAULT 'user',
+		status TEXT DEFAULT 'active',
+		created_at DATETIME,
+		updated_at DATETIME
 	);
 	-- Insert default public namespace if not exists
 	INSERT OR IGNORE INTO namespaces (name) VALUES ('public');
@@ -68,23 +71,54 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 
 // ... (existing methods) ...
 func (s *SQLiteStore) CreateUser(ctx context.Context, user *model.User) error {
-	query := `INSERT INTO users (username, password, created_at) VALUES (?, ?, ?)`
-	_, err := s.db.ExecContext(ctx, query, user.Username, user.Password, user.CreatedAt)
+	query := `INSERT INTO users (username, password, role, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
+	_, err := s.db.ExecContext(ctx, query, user.Username, user.Password, user.Role, user.Status, user.CreatedAt, user.UpdatedAt)
 	return err
 }
 
 func (s *SQLiteStore) GetUser(ctx context.Context, username string) (*model.User, error) {
-	query := `SELECT id, username, password, created_at FROM users WHERE username = ?`
+	query := `SELECT id, username, password, role, status, created_at, updated_at FROM users WHERE username = ?`
 	row := s.db.QueryRowContext(ctx, query, username)
 
 	var u model.User
-	if err := row.Scan(&u.ID, &u.Username, &u.Password, &u.CreatedAt); err != nil {
+	if err := row.Scan(&u.ID, &u.Username, &u.Password, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
 	return &u, nil
+}
+
+func (s *SQLiteStore) ListUsers(ctx context.Context) ([]*model.User, error) {
+	query := `SELECT id, username, password, role, status, created_at, updated_at FROM users ORDER BY username`
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*model.User
+	for rows.Next() {
+		var u model.User
+		if err := rows.Scan(&u.ID, &u.Username, &u.Password, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, &u)
+	}
+	return users, nil
+}
+
+func (s *SQLiteStore) UpdateUser(ctx context.Context, user *model.User) error {
+	query := `UPDATE users SET password = ?, role = ?, status = ?, updated_at = ? WHERE username = ?`
+	_, err := s.db.ExecContext(ctx, query, user.Password, user.Role, user.Status, user.UpdatedAt, user.Username)
+	return err
+}
+
+func (s *SQLiteStore) DeleteUser(ctx context.Context, username string) error {
+	query := `DELETE FROM users WHERE username = ?`
+	_, err := s.db.ExecContext(ctx, query, username)
+	return err
 }
 
 func (s *SQLiteStore) Get(ctx context.Context, namespace, group, key string) (*model.Config, error) {

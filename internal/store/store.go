@@ -30,4 +30,7 @@ type Store interface {
 	// User methods
 	CreateUser(ctx context.Context, user *model.User) error
 	GetUser(ctx context.Context, username string) (*model.User, error)
+	ListUsers(ctx context.Context) ([]*model.User, error)
+	UpdateUser(ctx context.Context, user *model.User) error
+	DeleteUser(ctx context.Context, username string) error
 }

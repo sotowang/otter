@@ -33,7 +33,7 @@ export const useConfig = () => {
       const configs = await configAPI.loadConfigs(namespace, group);
       setConfigState((prev) => ({
         ...prev,
-        configs,
+        configs: configs || [], // 确保始终是数组，即使API返回null
         isLoading: false,
       }));
     } catch (error) {

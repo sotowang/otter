@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { marked } from 'marked';
 import type { Config } from '../../types';
 
 interface ConfigListProps {
@@ -39,10 +40,66 @@ const ConfigList: React.FC<ConfigListProps> = React.memo(
         );
       }
 
-      return configs.map((cfg) => (
+      // 渲染配置值，根据类型格式化
+    const renderConfigValue = (value: string, type: string) => {
+      if (!value) return '';
+      
+      switch (type) {
+        case 'json':
+          try {
+            const parsed = JSON.parse(value);
+            return (
+              <div style={{ maxHeight: '120px', overflow: 'auto', margin: '0' }}>
+                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0, fontSize: '12px', backgroundColor: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
+                  {JSON.stringify(parsed, null, 2)}
+                </pre>
+              </div>
+            );
+          } catch (e) {
+            // 如果JSON解析失败，显示原始值
+            return (
+              <div style={{ maxHeight: '120px', overflow: 'auto', margin: '0' }}>
+                <div style={{ fontSize: '12px', backgroundColor: '#f5f5f5', padding: '8px', borderRadius: '4px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                  {value}
+                </div>
+              </div>
+            );
+          }
+        case 'markdown':
+          try {
+            const html = marked(value);
+            return (
+              <div 
+                className="markdown-content" 
+                dangerouslySetInnerHTML={{ __html: html }}
+                style={{ fontSize: '13px', maxHeight: '120px', overflow: 'auto', margin: '0' }}
+              />
+            );
+          } catch (e) {
+            // 如果Markdown渲染失败，显示原始值
+            return (
+              <div style={{ maxHeight: '120px', overflow: 'auto', margin: '0' }}>
+                <div style={{ fontSize: '12px', backgroundColor: '#f5f5f5', padding: '8px', borderRadius: '4px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                  {value}
+                </div>
+              </div>
+            );
+          }
+        default:
+          return (
+            <div style={{ maxHeight: '120px', overflow: 'auto', margin: '0' }}>
+              <div style={{ fontSize: '12px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                {value}
+              </div>
+            </div>
+          );
+      }
+    };
+
+    return configs.map((cfg) => (
         <tr key={`${cfg.namespace}-${cfg.group}-${cfg.key}`}>
           <td>{cfg.key}</td>
-          <td>{cfg.value}</td>
+          <td>{renderConfigValue(cfg.value, cfg.type || 'text')}</td>
           <td>{cfg.type || 'text'}</td>
           <td>{cfg.version}</td>
           <td className="actions">

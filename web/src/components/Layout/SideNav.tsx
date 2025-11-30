@@ -34,6 +34,12 @@ const SideNav: React.FC<SideNavProps> = ({
       icon: '📦',
       path: '/namespace-management',
     },
+    {
+      id: 'user-management',
+      title: 'User Management',
+      icon: '👥',
+      path: '/user-management',
+    },
   ];
 
   const handleNavClick = (item: NavItem, subItem?: NavSubItem) => {

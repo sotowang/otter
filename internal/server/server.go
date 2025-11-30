@@ -95,7 +95,10 @@ func (s *Server) initAdminUser() {
 		s.store.CreateUser(ctx, &model.User{
 			Username:  "admin",
 			Password:  "admin", // Default password
+			Role:      "admin",
+			Status:    "active",
 			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
 		})
 		s.logger.Info("Created default admin user", zap.String("username", "admin"), zap.String("password", "admin"))
 	}
@@ -135,6 +138,12 @@ func (s *Server) setupRoutes() {
 			// History routes
 			protected.GET("/namespaces/:namespace/groups/:group/configs/:key/history", s.listHistoryHandler)
 			protected.POST("/namespaces/:namespace/groups/:group/configs/:key/rollback", s.rollbackConfigHandler)
+
+			// User routes
+			protected.GET("/users", s.listUsersHandler)
+			protected.POST("/users", s.createUserHandler)
+			protected.PUT("/users/:username", s.updateUserHandler)
+			protected.DELETE("/users/:username", s.deleteUserHandler)
 		}
 	}
 }
@@ -658,6 +667,81 @@ func (s *Server) putConfigHandler(c *gin.Context) {
 		configType = "text"
 	}
 
+	// Validate JSON format if type is json
+	if configType == "json" {
+		// Check if value is valid JSON
+		var jsonObj map[string]interface{}
+		if err := json.Unmarshal([]byte(req.Value), &jsonObj); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
+			return
+		}
+
+		// Check for duplicate keys using a custom parser
+		// Standard json.Unmarshal automatically handles duplicates by keeping the last value
+		// So we need to use a custom parser to detect duplicates
+		decoder := json.NewDecoder(strings.NewReader(req.Value))
+		decoder.UseNumber()
+
+		// Check if it's an object
+		token, err := decoder.Token()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
+			return
+		}
+
+		// Must be an object start
+		if delim, ok := token.(json.Delim); !ok || delim != '{' {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "JSON must be an object"})
+			return
+		}
+
+		// Track keys to detect duplicates
+		keys := make(map[string]bool)
+
+		// Iterate through all key-value pairs
+		for decoder.More() {
+			token, err := decoder.Token()
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
+				return
+			}
+
+			// Must be a string key
+			keyStr, ok := token.(string)
+			if !ok {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "JSON keys must be strings"})
+				return
+			}
+
+			// Check for duplicate key
+			if keys[keyStr] {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "JSON contains duplicate keys"})
+				return
+			}
+			keys[keyStr] = true
+
+			// Skip the value
+			if err := decoder.Decode(&jsonObj); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
+				return
+			}
+		}
+
+		// Must end with object close
+		token, err = decoder.Token()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
+			return
+		}
+
+		// Check if it's an object end
+		delim, ok := token.(json.Delim)
+		if !ok || delim != '}' {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
+			return
+		}
+	}
+
 	config := &model.Config{
 		Namespace: namespace,
 		Group:     group,
@@ -826,4 +910,128 @@ func (s *Server) rollbackConfigHandler(c *gin.Context) {
 	s.watcher.Notify(config)
 
 	c.JSON(http.StatusOK, config)
+}
+
+// User management handlers
+
+// listUsersHandler returns all users
+func (s *Server) listUsersHandler(c *gin.Context) {
+	users, err := s.store.ListUsers(c.Request.Context())
+	if err != nil {
+		s.logger.Error("Failed to list users", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, users)
+}
+
+// createUserHandler creates a new user
+func (s *Server) createUserHandler(c *gin.Context) {
+	var req struct {
+		Username string `json:"username" binding:"required"`
+		Password string `json:"password" binding:"required"`
+		Role     string `json:"role" binding:"required,oneof=admin user"`
+		Status   string `json:"status" binding:"required,oneof=active inactive"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	// Check if user already exists
+	_, err := s.store.GetUser(c.Request.Context(), req.Username)
+	if err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "User already exists"})
+		return
+	} else if err != store.ErrNotFound {
+		s.logger.Error("Failed to check user existence", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Create new user
+	user := &model.User{
+		Username:  req.Username,
+		Password:  req.Password, // In production, this should be hashed
+		Role:      req.Role,
+		Status:    req.Status,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	if err := s.store.CreateUser(c.Request.Context(), user); err != nil {
+		s.logger.Error("Failed to create user", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, user)
+}
+
+// updateUserHandler updates an existing user
+func (s *Server) updateUserHandler(c *gin.Context) {
+	username := c.Param("username")
+
+	var req struct {
+		Password string `json:"password"`
+		Role     string `json:"role" binding:"required,oneof=admin user"`
+		Status   string `json:"status" binding:"required,oneof=active inactive"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	// Get existing user
+	user, err := s.store.GetUser(c.Request.Context(), username)
+	if err != nil {
+		if err == store.ErrNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			return
+		}
+		s.logger.Error("Failed to get user", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Update user fields
+	if req.Password != "" {
+		user.Password = req.Password // In production, this should be hashed
+	}
+	user.Role = req.Role
+	user.Status = req.Status
+	user.UpdatedAt = time.Now()
+
+	if err := s.store.UpdateUser(c.Request.Context(), user); err != nil {
+		s.logger.Error("Failed to update user", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
+}
+
+// deleteUserHandler deletes a user
+func (s *Server) deleteUserHandler(c *gin.Context) {
+	username := c.Param("username")
+
+	// Prevent deleting admin user
+	if username == "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot delete admin user"})
+		return
+	}
+
+	if err := s.store.DeleteUser(c.Request.Context(), username); err != nil {
+		if err == store.ErrNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			return
+		}
+		s.logger.Error("Failed to delete user", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }

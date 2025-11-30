@@ -23,9 +23,13 @@ export interface ConfigHistory {
 
 // 用户类型
 export interface User {
+  id: number;
   username: string;
   password: string;
+  role: 'admin' | 'user';
+  status: 'active' | 'inactive';
   created_at: string;
+  updated_at: string;
 }
 
 // 导航项类型

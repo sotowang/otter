@@ -39,6 +39,31 @@ func (s *InMemoryStore) GetUser(ctx context.Context, username string) (*model.Us
 	return val.(*model.User), nil
 }
 
+func (s *InMemoryStore) ListUsers(ctx context.Context) ([]*model.User, error) {
+	var users []*model.User
+	s.users.Range(func(key, value any) bool {
+		users = append(users, value.(*model.User))
+		return true
+	})
+	return users, nil
+}
+
+func (s *InMemoryStore) UpdateUser(ctx context.Context, user *model.User) error {
+	if _, ok := s.users.Load(user.Username); !ok {
+		return ErrNotFound
+	}
+	s.users.Store(user.Username, user)
+	return nil
+}
+
+func (s *InMemoryStore) DeleteUser(ctx context.Context, username string) error {
+	if _, ok := s.users.Load(username); !ok {
+		return ErrNotFound
+	}
+	s.users.Delete(username)
+	return nil
+}
+
 func (s *InMemoryStore) Get(ctx context.Context, namespace, group, key string) (*model.Config, error) {
 	val, ok := s.data.Load(namespace + "/" + group + "/" + key)
 	if !ok {
