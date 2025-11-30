@@ -10,13 +10,17 @@ import (
 
 // InMemoryStore implements Store using an in-memory map.
 type InMemoryStore struct {
-	data    sync.Map // map[string]*model.Config
-	history sync.Map // map[string][]*model.ConfigHistory
-	users   sync.Map // map[string]*model.User (key: username)
+	data       sync.Map // map[string]*model.Config
+	history    sync.Map // map[string][]*model.ConfigHistory
+	users      sync.Map // map[string]*model.User (key: username)
+	namespaces sync.Map // map[string]bool (key: namespace)
 }
 
 func NewInMemoryStore() *InMemoryStore {
-	return &InMemoryStore{}
+	store := &InMemoryStore{}
+	// Add default public namespace
+	store.namespaces.Store("public", true)
+	return store
 }
 
 func (s *InMemoryStore) CreateUser(ctx context.Context, user *model.User) error {
@@ -44,6 +48,10 @@ func (s *InMemoryStore) Get(ctx context.Context, namespace, group, key string) (
 }
 
 func (s *InMemoryStore) Put(ctx context.Context, config *model.Config) error {
+	// Set default type if not provided
+	if config.Type == "" {
+		config.Type = "text"
+	}
 	s.data.Store(config.Namespace+"/"+config.Group+"/"+config.Key, config)
 	return nil
 }
@@ -80,4 +88,51 @@ func (s *InMemoryStore) ListHistory(ctx context.Context, namespace, group, key s
 		return []*model.ConfigHistory{}, nil
 	}
 	return val.([]*model.ConfigHistory), nil
+}
+
+func (s *InMemoryStore) ListNamespaces(ctx context.Context) ([]string, error) {
+	var namespaces []string
+	s.namespaces.Range(func(key, value any) bool {
+		namespaces = append(namespaces, key.(string))
+		return true
+	})
+	return namespaces, nil
+}
+
+func (s *InMemoryStore) CreateNamespace(ctx context.Context, namespace string) error {
+	if namespace == "" {
+		return fmt.Errorf("namespace cannot be empty")
+	}
+	if _, ok := s.namespaces.Load(namespace); ok {
+		return fmt.Errorf("namespace already exists")
+	}
+	s.namespaces.Store(namespace, true)
+	return nil
+}
+
+func (s *InMemoryStore) DeleteNamespace(ctx context.Context, namespace string) error {
+	if namespace == "" {
+		return fmt.Errorf("namespace cannot be empty")
+	}
+	if namespace == "public" {
+		return fmt.Errorf("cannot delete default public namespace")
+	}
+	
+	// Check if there are any configs in this namespace
+	var hasConfigs bool
+	s.data.Range(func(key, value any) bool {
+		cfg := value.(*model.Config)
+		if cfg.Namespace == namespace {
+			hasConfigs = true
+			return false
+		}
+		return true
+	})
+	
+	if hasConfigs {
+		return fmt.Errorf("cannot delete namespace with existing configs")
+	}
+	
+	s.namespaces.Delete(namespace)
+	return nil
 }

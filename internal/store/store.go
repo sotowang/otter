@@ -18,6 +18,11 @@ type Store interface {
 	Delete(ctx context.Context, namespace, group, key string) error
 	List(ctx context.Context, namespace, group string) ([]*model.Config, error)
 
+	// Namespace methods
+	ListNamespaces(ctx context.Context) ([]string, error)
+	CreateNamespace(ctx context.Context, namespace string) error
+	DeleteNamespace(ctx context.Context, namespace string) error
+
 	// History methods
 	CreateHistory(ctx context.Context, history *model.ConfigHistory) error
 	ListHistory(ctx context.Context, namespace, group, key string) ([]*model.ConfigHistory, error)

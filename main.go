@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
-	"log"
-	"net/http"
+
+	"go.uber.org/zap"
 
 	"otter/internal/server"
 	"otter/internal/store"
@@ -15,28 +15,34 @@ func main() {
 	jwtSecret := flag.String("jwt-secret", "default-secret-key", "JWT secret key")
 	flag.Parse()
 
+	// Initialize zap logger
+	logger, err := zap.NewProduction()
+	if err != nil {
+		panic("Failed to initialize logger")
+	}
+	defer logger.Sync()
+
 	var s store.Store
-	var err error
 
 	if *dsn != "" {
-		log.Printf("Using PostgreSQL storage")
+		logger.Info("Using PostgreSQL storage")
 		s, err = store.NewPostgresStore(*dsn)
 	} else {
-		log.Printf("Using In-Memory storage")
+		logger.Info("Using In-Memory storage")
 		s = store.NewInMemoryStore()
 	}
 
 	if err != nil {
-		log.Fatalf("Failed to initialize store: %v", err)
+		logger.Fatal("Failed to initialize store", zap.Error(err))
 	}
 
 	// Initialize server
-	srv := server.NewServer(s, *jwtSecret)
+	srv := server.NewServer(s, *jwtSecret, logger)
 
 	// Start HTTP server
 	addr := ":" + *port
-	log.Printf("Starting otter config center on %s", addr)
-	if err := http.ListenAndServe(addr, srv); err != nil {
-		log.Fatalf("Server failed: %v", err)
+	logger.Info("Starting otter config center", zap.String("port", *port))
+	if err := srv.Run(addr); err != nil {
+		logger.Fatal("Server failed", zap.Error(err))
 	}
 }

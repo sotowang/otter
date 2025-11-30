@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"otter/internal/model"
 
@@ -25,8 +26,12 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 
 	// Create table if not exists
 	query := `
+	CREATE TABLE IF NOT EXISTS namespaces (
+		name TEXT PRIMARY KEY,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
 	CREATE TABLE IF NOT EXISTS configs (
-		namespace TEXT,
+		namespace TEXT REFERENCES namespaces(name) ON DELETE CASCADE,
 		"group" TEXT,
 		key TEXT,
 		value TEXT,
@@ -51,6 +56,8 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 		password TEXT,
 		created_at DATETIME
 	);
+	-- Insert default public namespace if not exists
+	INSERT OR IGNORE INTO namespaces (name) VALUES ('public');
 	`
 	if _, err := db.Exec(query); err != nil {
 		return nil, err
@@ -158,4 +165,39 @@ func (s *SQLiteStore) ListHistory(ctx context.Context, namespace, group, key str
 		histories = append(histories, &h)
 	}
 	return histories, nil
+}
+
+func (s *SQLiteStore) ListNamespaces(ctx context.Context) ([]string, error) {
+	query := `SELECT name FROM namespaces ORDER BY name`
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var namespaces []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		namespaces = append(namespaces, name)
+	}
+	return namespaces, nil
+}
+
+func (s *SQLiteStore) CreateNamespace(ctx context.Context, namespace string) error {
+	query := `INSERT INTO namespaces (name) VALUES (?)`
+	_, err := s.db.ExecContext(ctx, query, namespace)
+	return err
+}
+
+func (s *SQLiteStore) DeleteNamespace(ctx context.Context, namespace string) error {
+	if namespace == "public" {
+		return fmt.Errorf("cannot delete default public namespace")
+	}
+
+	query := `DELETE FROM namespaces WHERE name = ?`
+	_, err := s.db.ExecContext(ctx, query, namespace)
+	return err
 }
