@@ -44,7 +44,13 @@ export const authAPI = {
       body: JSON.stringify({ username, password }),
     });
 
-    return handleResponse<{ token: string }>(response);
+    const tokenResponse = await handleResponse<{
+      access_token: string;
+      refresh_token: string;
+      expires_in: number;
+    }>(response);
+
+    return { token: tokenResponse.access_token };
   },
 };
 
