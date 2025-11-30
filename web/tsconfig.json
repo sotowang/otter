@@ -1,8 +1,8 @@
 {
   "files": [],
   "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
+    { "path": "./tsconfig.app.json" }, // 要求 tsconfig.app.json 中设置 "composite": true
+    { "path": "./tsconfig.node.json" } // 要求 tsconfig.node.json 中设置 "composite": true
   ],
   "compilerOptions": {
     "esModuleInterop": true,

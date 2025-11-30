@@ -101,7 +101,7 @@ const ConfigList: React.FC<ConfigListProps> = React.memo(
           <td>{cfg.key}</td>
           <td>{renderConfigValue(cfg.value, cfg.type || 'text')}</td>
           <td>{cfg.type || 'text'}</td>
-          <td>{cfg.version}</td>
+          <td>{new Date(cfg.updated_at).toLocaleString()}</td>
           <td className="actions">
             <button onClick={() => onEdit(cfg)}>Edit</button>
             <button onClick={() => onHistory(cfg)}>History</button>
@@ -118,7 +118,7 @@ const ConfigList: React.FC<ConfigListProps> = React.memo(
             <th>Key</th>
             <th>Value</th>
             <th>Type</th>
-            <th>Version</th>
+            <th>Updated At</th>
             <th>Actions</th>
           </tr>
         </thead>

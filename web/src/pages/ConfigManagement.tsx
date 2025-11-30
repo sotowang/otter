@@ -9,7 +9,7 @@ import type { Config, ConfigHistory } from '../types';
 import { namespaceAPI } from '../services/api';
 
 const ConfigManagement: React.FC = () => {
-  const { username, logout } = useAuth();
+  useAuth();
   const configHook = useConfig();
   const {
     configs,
