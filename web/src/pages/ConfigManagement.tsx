@@ -86,9 +86,13 @@ const ConfigManagement: React.FC = () => {
   const handleSaveConfig = async (
     config: Omit<Config, 'version' | 'created_at' | 'updated_at'>
   ) => {
-    const success = await saveConfig(namespace, group, config.key, config.value, config.type);
+    const success = await saveConfig(config.namespace, group, config.key, config.value, config.type);
     if (success) {
       closeCreateConfigModal();
+      // 如果保存成功，并且当前显示的是保存的namespace，重新加载配置
+      if (config.namespace === namespace) {
+        loadConfigs(namespace, group);
+      }
     }
   };
 
@@ -251,6 +255,8 @@ const ConfigManagement: React.FC = () => {
         <ConfigForm
           initialConfig={selectedConfig}
           onSave={handleSaveConfig}
+          namespaces={namespaces}
+          currentNamespace={namespace}
         />
         <div className="modal-footer">
           <button

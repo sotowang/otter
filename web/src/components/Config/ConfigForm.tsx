@@ -6,10 +6,12 @@ interface ConfigFormProps {
   onSave: (
     config: Omit<Config, 'version' | 'created_at' | 'updated_at'>
   ) => void;
+  namespaces: string[];
+  currentNamespace: string;
 }
 
 const ConfigForm: React.FC<ConfigFormProps> = React.memo(
-  ({ initialConfig, onSave }) => {
+  ({ initialConfig, onSave, namespaces, currentNamespace }) => {
     // 配置类型选项
     const configTypes = [
       { value: 'text', label: 'Text' },
@@ -42,6 +44,7 @@ const ConfigForm: React.FC<ConfigFormProps> = React.memo(
     const [key, setKey] = useState(initialConfig?.key || '');
     const [value, setValue] = useState(initialConfig ? formatConfigValue(initialConfig.value, initialConfig.type) : '');
     const [type, setType] = useState(initialConfig?.type || 'text');
+    const [namespace, setNamespace] = useState(initialConfig?.namespace || currentNamespace);
     const [isEditMode, setIsEditMode] = useState(!!initialConfig);
     const [error, setError] = useState<string | null>(null);
 
@@ -57,8 +60,9 @@ const ConfigForm: React.FC<ConfigFormProps> = React.memo(
       setKey('');
       setValue('');
       setType('text');
+      setNamespace(currentNamespace);
       setIsEditMode(false);
-    }, []);
+    }, [currentNamespace]);
 
     // 验证配置值，根据类型
     const validateConfigValue = (val: string, type: string): string | null => {
@@ -118,9 +122,9 @@ const ConfigForm: React.FC<ConfigFormProps> = React.memo(
           return;
         }
         
-        if (key.trim() && value.trim()) {
+        if (key.trim() && value.trim() && namespace) {
           onSave({
-            namespace: '', // 由父组件提供
+            namespace,
             group: '', // 由父组件提供
             key: key.trim(),
             value: value.trim(),
@@ -128,6 +132,8 @@ const ConfigForm: React.FC<ConfigFormProps> = React.memo(
           });
           resetForm();
           setError(null);
+        } else if (!namespace) {
+          setError('Namespace is required');
         }
       },
       [key, value, type, onSave, resetForm]
@@ -142,6 +148,26 @@ const ConfigForm: React.FC<ConfigFormProps> = React.memo(
 
     return (
       <form id="configForm" onSubmit={handleSubmit} role="form">
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="namespace">Namespace:</label>
+            <select
+              id="namespace"
+              value={namespace}
+              onChange={(e) => setNamespace(e.target.value)}
+              className={error && !namespace ? 'input-error' : ''}
+            >
+              <option value="" disabled>
+                Select namespace
+              </option>
+              {namespaces.map((ns) => (
+                <option key={ns} value={ns}>
+                  {ns}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
         <div className="form-row">
           <div className="form-group">
             <label htmlFor="key">Key:</label>
