@@ -148,6 +148,14 @@ func (c *Client) GetConnectionStats() ConnectionStats {
 	return c.stats
 }
 
+// TokenResponse represents the server response for login
+
+type TokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int64  `json:"expires_in"`
+}
+
 // Login authenticates with the server and gets a token
 
 func (c *Client) Login(username, password string) error {
@@ -170,13 +178,13 @@ func (c *Client) Login(username, password string) error {
 		return fmt.Errorf("login failed: status %d", resp.StatusCode)
 	}
 
-	var res map[string]string
+	var res TokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
 		c.updateStats(startTime, false)
 		return err
 	}
 
-	c.token = res["token"]
+	c.token = res.AccessToken
 	c.updateStats(startTime, true)
 	return nil
 }

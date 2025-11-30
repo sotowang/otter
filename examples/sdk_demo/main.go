@@ -16,7 +16,7 @@ func main() {
 	}
 	fmt.Println("Login successful")
 
-	namespace := "default"
+	namespace := "public"
 	group := "DEFAULT_GROUP"
 	key := "sdk_test_key"
 

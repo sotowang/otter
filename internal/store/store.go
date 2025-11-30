@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("config not found")
+	ErrNotFound    = errors.New("config not found")
 	ErrRateLimited = errors.New("rate limit exceeded")
 )
 
@@ -35,12 +35,12 @@ type Store interface {
 	ListUsers(ctx context.Context) ([]*model.User, error)
 	UpdateUser(ctx context.Context, user *model.User) error
 	DeleteUser(ctx context.Context, username string) error
-	
+
 	// Token methods for security
 	AddTokenToBlacklist(ctx context.Context, token string, expiresAt time.Time) error
 	IsTokenBlacklisted(ctx context.Context, token string) (bool, error)
 	CleanupExpiredTokens(ctx context.Context) error
-	
+
 	// Rate limiting methods
 	IncrementTokenUsage(ctx context.Context, token string) (int64, error)
 	CheckTokenRateLimit(ctx context.Context, token string, limit int64, duration time.Duration) (bool, error)
