@@ -110,9 +110,6 @@ func (s *Server) setupRoutes() {
 	s.engine.StaticFile("/", "./web/index.html")
 	s.engine.Static("/static", "./web/static")
 
-	// Serve JS and CSS files
-	s.engine.StaticFile("/app.js", "./web/app.js")
-
 	// API Routes
 	api := s.engine.Group("/api/v1")
 	{
