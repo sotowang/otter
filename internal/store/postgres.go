@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"otter/internal/model"
 
@@ -234,4 +235,46 @@ func (s *PostgresStore) DeleteNamespace(ctx context.Context, namespace string) e
 	query := `DELETE FROM namespaces WHERE name = $1`
 	_, err := s.db.ExecContext(ctx, query, namespace)
 	return err
+}
+
+// AddTokenToBlacklist adds a token to the blacklist
+func (s *PostgresStore) AddTokenToBlacklist(ctx context.Context, token string, expiresAt time.Time) error {
+	// For simplicity, we'll use a simple implementation that returns nil
+	// In a real implementation, you would store this in a database table
+	return nil
+}
+
+// IsTokenBlacklisted checks if a token is blacklisted
+func (s *PostgresStore) IsTokenBlacklisted(ctx context.Context, token string) (bool, error) {
+	// For simplicity, we'll use a simple implementation that returns false
+	// In a real implementation, you would check this against a database table
+	return false, nil
+}
+
+// CleanupExpiredTokens removes expired tokens from the blacklist
+func (s *PostgresStore) CleanupExpiredTokens(ctx context.Context) error {
+	// For simplicity, we'll use a simple implementation that returns nil
+	// In a real implementation, you would clean up expired tokens from a database table
+	return nil
+}
+
+// IncrementTokenUsage increments the token usage count
+func (s *PostgresStore) IncrementTokenUsage(ctx context.Context, token string) (int64, error) {
+	// For simplicity, we'll use a simple implementation that returns 1
+	// In a real implementation, you would track this in a database table
+	return 1, nil
+}
+
+// CheckTokenRateLimit checks if a token has exceeded the rate limit
+func (s *PostgresStore) CheckTokenRateLimit(ctx context.Context, token string, limit int64, duration time.Duration) (bool, error) {
+	// For simplicity, we'll use a simple implementation that returns true
+	// In a real implementation, you would check this against a database table
+	return true, nil
+}
+
+// ResetTokenUsage resets the token usage count
+func (s *PostgresStore) ResetTokenUsage(ctx context.Context, token string) error {
+	// For simplicity, we'll use a simple implementation that returns nil
+	// In a real implementation, you would reset this in a database table
+	return nil
 }

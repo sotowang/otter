@@ -5,30 +5,153 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"otter/internal/model"
 )
 
+// ClientConfig contains configuration for the client
+
+type ClientConfig struct {
+	// Endpoint is the server endpoint URL
+	Endpoint string
+	// Token is the authentication token
+	Token string
+	// ConnectionPoolSize is the maximum number of connections in the pool
+	ConnectionPoolSize int
+	// ConnectionIdleTimeout is the time after which idle connections are closed
+	ConnectionIdleTimeout time.Duration
+	// RequestTimeout is the timeout for each HTTP request
+	RequestTimeout time.Duration
+	// WatchTimeout is the timeout for watch requests
+	WatchTimeout time.Duration
+}
+
+// ConnectionStats contains connection statistics
+type ConnectionStats struct {
+	TotalRequests      int64         `json:"total_requests"`
+	SuccessfulRequests int64         `json:"successful_requests"`
+	FailedRequests     int64         `json:"failed_requests"`
+	TotalDuration      time.Duration `json:"total_duration"`
+	AverageDuration    time.Duration `json:"average_duration"`
+	LastRequestTime    time.Time     `json:"last_request_time"`
+	ErrorRate          float64       `json:"error_rate"`
+}
+
+// Client represents a client for the Otter config center
+
 type Client struct {
 	endpoint string
 	token    string
 	client   *http.Client
+	config   ClientConfig
+
+	// Connection statistics
+	mu    sync.Mutex
+	stats ConnectionStats
 }
 
+// NewClient creates a new client with default configuration
+
 func NewClient(endpoint string) *Client {
+	return NewClientWithConfig(ClientConfig{
+		Endpoint:              endpoint,
+		ConnectionPoolSize:    10,
+		ConnectionIdleTimeout: 60 * time.Second,
+		RequestTimeout:        10 * time.Second,
+		WatchTimeout:          40 * time.Second,
+	})
+}
+
+// NewClientWithConfig creates a new client with custom configuration
+
+func NewClientWithConfig(config ClientConfig) *Client {
+	// Set default values if not provided
+	if config.ConnectionPoolSize <= 0 {
+		config.ConnectionPoolSize = 10
+	}
+	if config.ConnectionIdleTimeout <= 0 {
+		config.ConnectionIdleTimeout = 60 * time.Second
+	}
+	if config.RequestTimeout <= 0 {
+		config.RequestTimeout = 10 * time.Second
+	}
+	if config.WatchTimeout <= 0 {
+		config.WatchTimeout = 40 * time.Second
+	}
+
+	// Create HTTP client with connection pool
+	transport := &http.Transport{
+		MaxIdleConns:          config.ConnectionPoolSize,
+		MaxIdleConnsPerHost:   config.ConnectionPoolSize,
+		IdleConnTimeout:       config.ConnectionIdleTimeout,
+		MaxConnsPerHost:       config.ConnectionPoolSize * 2, // Allow temporary burst
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   config.RequestTimeout,
+	}
+
 	return &Client{
-		endpoint: endpoint,
-		client:   &http.Client{Timeout: 10 * time.Second},
+		endpoint: config.Endpoint,
+		token:    config.Token,
+		client:   client,
+		config:   config,
+		stats: ConnectionStats{
+			LastRequestTime: time.Now(),
+		},
 	}
 }
+
+// WithAuth sets the authentication token
 
 func (c *Client) WithAuth(token string) *Client {
 	c.token = token
 	return c
 }
 
+// updateStats updates connection statistics based on request result
+func (c *Client) updateStats(startTime time.Time, success bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	duration := time.Since(startTime)
+	c.stats.TotalRequests++
+	c.stats.TotalDuration += duration
+	c.stats.LastRequestTime = time.Now()
+
+	if success {
+		c.stats.SuccessfulRequests++
+	} else {
+		c.stats.FailedRequests++
+	}
+
+	// Calculate average duration
+	if c.stats.TotalRequests > 0 {
+		c.stats.AverageDuration = c.stats.TotalDuration / time.Duration(c.stats.TotalRequests)
+	}
+
+	// Calculate error rate
+	if c.stats.TotalRequests > 0 {
+		c.stats.ErrorRate = float64(c.stats.FailedRequests) / float64(c.stats.TotalRequests) * 100
+	}
+}
+
+// GetConnectionStats returns current connection statistics
+func (c *Client) GetConnectionStats() ConnectionStats {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.stats
+}
+
+// Login authenticates with the server and gets a token
+
 func (c *Client) Login(username, password string) error {
+	startTime := time.Now()
 	url := fmt.Sprintf("%s/api/v1/login", c.endpoint)
 	reqBody, _ := json.Marshal(map[string]string{
 		"username": username,
@@ -37,27 +160,35 @@ func (c *Client) Login(username, password string) error {
 
 	resp, err := c.client.Post(url, "application/json", bytes.NewBuffer(reqBody))
 	if err != nil {
+		c.updateStats(startTime, false)
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		c.updateStats(startTime, false)
 		return fmt.Errorf("login failed: status %d", resp.StatusCode)
 	}
 
 	var res map[string]string
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		c.updateStats(startTime, false)
 		return err
 	}
 
 	c.token = res["token"]
+	c.updateStats(startTime, true)
 	return nil
 }
 
+// GetConfig retrieves a configuration item
+
 func (c *Client) GetConfig(namespace, group, key string) (*model.Config, error) {
+	startTime := time.Now()
 	url := fmt.Sprintf("%s/api/v1/namespaces/%s/groups/%s/configs/%s", c.endpoint, namespace, group, key)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
+		c.updateStats(startTime, false)
 		return nil, err
 	}
 
@@ -67,41 +198,58 @@ func (c *Client) GetConfig(namespace, group, key string) (*model.Config, error) 
 
 	resp, err := c.client.Do(req)
 	if err != nil {
+		c.updateStats(startTime, false)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		c.updateStats(startTime, false)
 		return nil, fmt.Errorf("failed to get config: status %d", resp.StatusCode)
 	}
 
 	var cfg model.Config
 	if err := json.NewDecoder(resp.Body).Decode(&cfg); err != nil {
+		c.updateStats(startTime, false)
 		return nil, err
 	}
+	c.updateStats(startTime, true)
 	return &cfg, nil
 }
 
+// WatchConfig watches for changes to a configuration item
+
 func (c *Client) WatchConfig(namespace, group, key string, callback func(*model.Config)) {
 	go func() {
-		// Use a separate client with longer timeout for watching
-		watchClient := &http.Client{Timeout: 40 * time.Second}
 		url := fmt.Sprintf("%s/api/v1/namespaces/%s/groups/%s/configs/%s/watch", c.endpoint, namespace, group, key)
 
+		// Create a custom request with longer timeout for watching
+		req, err := http.NewRequest(http.MethodGet, url, nil)
+		if err != nil {
+			time.Sleep(2 * time.Second)
+			return
+		}
+
+		if c.token != "" {
+			req.Header.Set("Authorization", "Bearer "+c.token)
+		}
+
 		for {
-			req, err := http.NewRequest(http.MethodGet, url, nil)
-			if err != nil {
-				time.Sleep(2 * time.Second)
-				continue
+			startTime := time.Now()
+
+			// Create a copy of the request with the same headers
+			watchReq := req.Clone(req.Context())
+
+			// Create a custom client with watch timeout for this request only
+			watchClient := &http.Client{
+				Transport: c.client.Transport, // Reuse the same connection pool
+				Timeout:   c.config.WatchTimeout,
 			}
 
-			if c.token != "" {
-				req.Header.Set("Authorization", "Bearer "+c.token)
-			}
-
-			resp, err := watchClient.Do(req)
+			resp, err := watchClient.Do(watchReq)
 			if err != nil {
 				// Log error and retry after delay
+				c.updateStats(startTime, false)
 				time.Sleep(2 * time.Second)
 				continue
 			}
@@ -111,10 +259,13 @@ func (c *Client) WatchConfig(namespace, group, key string, callback func(*model.
 				if err := json.NewDecoder(resp.Body).Decode(&cfg); err == nil {
 					callback(&cfg)
 				}
+				c.updateStats(startTime, true)
 			} else if resp.StatusCode == http.StatusNotModified {
 				// Timeout, just retry
+				c.updateStats(startTime, true) // Treat timeout as successful for stats
 			} else {
 				// Error, retry after delay
+				c.updateStats(startTime, false)
 				time.Sleep(2 * time.Second)
 			}
 			resp.Body.Close()

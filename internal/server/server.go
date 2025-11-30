@@ -53,12 +53,28 @@ func (w *Watcher) Notify(config *model.Config) {
 	w.subscribers.Delete(fullKey)
 }
 
+// ConnectionStats contains connection statistics for the server
+type ConnectionStats struct {
+	TotalRequests      int64         `json:"total_requests"`
+	ActiveConnections  int64         `json:"active_connections"`
+	SuccessfulRequests int64         `json:"successful_requests"`
+	FailedRequests     int64         `json:"failed_requests"`
+	TotalDuration      time.Duration `json:"total_duration"`
+	AverageDuration    time.Duration `json:"average_duration"`
+	LastRequestTime    time.Time     `json:"last_request_time"`
+	ErrorRate          float64       `json:"error_rate"`
+}
+
 type Server struct {
 	store     store.Store
 	watcher   *Watcher
 	jwtSecret string
 	engine    *gin.Engine
 	logger    *zap.Logger
+
+	// Connection statistics
+	mu    sync.Mutex
+	stats ConnectionStats
 }
 
 func NewServer(store store.Store, jwtSecret string, logger *zap.Logger) *Server {
@@ -71,6 +87,9 @@ func NewServer(store store.Store, jwtSecret string, logger *zap.Logger) *Server 
 		jwtSecret: jwtSecret,
 		engine:    gin.New(),
 		logger:    logger,
+		stats: ConnectionStats{
+			LastRequestTime: time.Now(),
+		},
 	}
 
 	// Initialize default admin user
@@ -78,9 +97,66 @@ func NewServer(store store.Store, jwtSecret string, logger *zap.Logger) *Server 
 
 	// Setup Gin middleware
 	s.engine.Use(gin.Recovery())
+	s.engine.Use(s.statsMiddleware())
 	s.setupRoutes()
 
 	return s
+}
+
+// statsMiddleware is a Gin middleware that collects connection statistics
+func (s *Server) statsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Increment active connections
+		s.mu.Lock()
+		s.stats.ActiveConnections++
+		s.mu.Unlock()
+
+		startTime := time.Now()
+
+		// Process request
+		c.Next()
+
+		// Calculate duration
+		duration := time.Since(startTime)
+
+		// Determine if request was successful (status < 500)
+		success := c.Writer.Status() < 500
+
+		// Update statistics
+		s.mu.Lock()
+		s.stats.TotalRequests++
+		s.stats.TotalDuration += duration
+		s.stats.LastRequestTime = time.Now()
+
+		if success {
+			s.stats.SuccessfulRequests++
+		} else {
+			s.stats.FailedRequests++
+		}
+
+		// Calculate average duration
+		if s.stats.TotalRequests > 0 {
+			s.stats.AverageDuration = s.stats.TotalDuration / time.Duration(s.stats.TotalRequests)
+		}
+
+		// Calculate error rate
+		if s.stats.TotalRequests > 0 {
+			s.stats.ErrorRate = float64(s.stats.FailedRequests) / float64(s.stats.TotalRequests) * 100
+		}
+
+		// Decrement active connections
+		s.stats.ActiveConnections--
+		s.mu.Unlock()
+	}
+}
+
+// getStatsHandler returns the current connection statistics
+func (s *Server) getStatsHandler(c *gin.Context) {
+	s.mu.Lock()
+	stats := s.stats
+	s.mu.Unlock()
+
+	c.JSON(http.StatusOK, stats)
 }
 
 // Run starts the HTTP server
@@ -118,6 +194,10 @@ func (s *Server) setupRoutes() {
 	{
 		// Public routes
 		api.POST("/login", s.loginHandler)
+		api.POST("/refresh", s.refreshTokenHandler)
+
+		// Connection stats route (public for monitoring)
+		api.GET("/stats", s.getStatsHandler)
 
 		// Protected routes
 		protected := api.Group("/")
@@ -545,14 +625,18 @@ func (s *Server) loginHandler(c *gin.Context) {
 		return
 	}
 
-	// Generate JWT token using the existing generateToken function
-	token, err := s.generateToken(req.Username)
+	// Generate JWT tokens
+	accessToken, refreshToken, expiresIn, err := s.generateTokens(req.Username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"token": token})
+	c.JSON(http.StatusOK, gin.H{
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+		"expires_in":    expiresIn,
+	})
 }
 
 // listNamespacesHandler returns all namespaces
