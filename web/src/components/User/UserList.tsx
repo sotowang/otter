@@ -6,9 +6,10 @@ import Modal from '../Common/Modal';
 interface UserListProps {
   onEditUser: (user: User) => void;
   onAddUser: () => void;
+  refreshTrigger: number;
 }
 
-const UserList: React.FC<UserListProps> = ({ onEditUser, onAddUser }) => {
+const UserList: React.FC<UserListProps> = ({ onEditUser, onAddUser, refreshTrigger }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -43,7 +44,7 @@ const UserList: React.FC<UserListProps> = ({ onEditUser, onAddUser }) => {
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [refreshTrigger]);
 
   // 筛选用户
   useEffect(() => {
@@ -64,8 +65,14 @@ const UserList: React.FC<UserListProps> = ({ onEditUser, onAddUser }) => {
     }
 
     setFilteredUsers(result);
-    setCurrentPage(1); // 筛选条件变化时重置到第一页
-  }, [searchParams, users]);
+    // 确保currentPage不超过总页数
+    const totalPages = Math.ceil(result.length / usersPerPage);
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    } else if (totalPages === 0) {
+      setCurrentPage(1);
+    }
+  }, [searchParams, users, currentPage, usersPerPage]);
 
   // 处理搜索参数变化
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

@@ -26,6 +26,11 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
     throw new Error(errorText || 'API request failed');
   }
 
+  // 204 No Content响应没有响应体，直接返回undefined
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json();
 };
 
