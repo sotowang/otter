@@ -25,14 +25,19 @@ func NewPostgresStore(dsn string) (*PostgresStore, error) {
 		return nil, err
 	}
 
+	// Create schema if not exists
+	if _, err := db.Exec("CREATE SCHEMA IF NOT EXISTS otter"); err != nil {
+		return nil, err
+	}
+
 	// Create table if not exists
 	query := `
-	CREATE TABLE IF NOT EXISTS namespaces (
+	CREATE TABLE IF NOT EXISTS otter.namespaces (
 		name TEXT PRIMARY KEY,
 		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 	);
-	CREATE TABLE IF NOT EXISTS configs (
-		namespace TEXT REFERENCES namespaces(name) ON DELETE CASCADE,
+	CREATE TABLE IF NOT EXISTS otter.configs (
+		namespace TEXT REFERENCES otter.namespaces(name) ON DELETE CASCADE,
 		"group" TEXT,
 		key TEXT,
 		value TEXT,
@@ -41,7 +46,7 @@ func NewPostgresStore(dsn string) (*PostgresStore, error) {
 		updated_at TIMESTAMP WITH TIME ZONE,
 		PRIMARY KEY (namespace, "group", key)
 	);
-	CREATE TABLE IF NOT EXISTS config_history (
+	CREATE TABLE IF NOT EXISTS otter.config_history (
 		id SERIAL PRIMARY KEY,
 		namespace TEXT,
 		"group" TEXT,
@@ -51,7 +56,7 @@ func NewPostgresStore(dsn string) (*PostgresStore, error) {
 		op_type TEXT,
 		created_at TIMESTAMP WITH TIME ZONE
 	);
-	CREATE TABLE IF NOT EXISTS users (
+	CREATE TABLE IF NOT EXISTS otter.users (
 		id SERIAL PRIMARY KEY,
 		username TEXT UNIQUE,
 		password TEXT,
@@ -61,7 +66,7 @@ func NewPostgresStore(dsn string) (*PostgresStore, error) {
 		updated_at TIMESTAMP WITH TIME ZONE
 	);
 	-- Insert default public namespace if not exists
-	INSERT INTO namespaces (name) VALUES ('public') ON CONFLICT DO NOTHING;
+	INSERT INTO otter.namespaces (name) VALUES ('public') ON CONFLICT DO NOTHING;
 	`
 	if _, err := db.Exec(query); err != nil {
 		return nil, err
@@ -72,13 +77,13 @@ func NewPostgresStore(dsn string) (*PostgresStore, error) {
 
 // ... (existing methods) ...
 func (s *PostgresStore) CreateUser(ctx context.Context, user *model.User) error {
-	query := `INSERT INTO users (username, password, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)`
+	query := `INSERT INTO otter.users (username, password, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)`
 	_, err := s.db.ExecContext(ctx, query, user.Username, user.Password, user.Role, user.Status, user.CreatedAt, user.UpdatedAt)
 	return err
 }
 
 func (s *PostgresStore) GetUser(ctx context.Context, username string) (*model.User, error) {
-	query := `SELECT id, username, password, role, status, created_at, updated_at FROM users WHERE username = $1`
+	query := `SELECT id, username, password, role, status, created_at, updated_at FROM otter.users WHERE username = $1`
 	row := s.db.QueryRowContext(ctx, query, username)
 
 	var u model.User
@@ -92,7 +97,7 @@ func (s *PostgresStore) GetUser(ctx context.Context, username string) (*model.Us
 }
 
 func (s *PostgresStore) ListUsers(ctx context.Context) ([]*model.User, error) {
-	query := `SELECT id, username, password, role, status, created_at, updated_at FROM users ORDER BY username`
+	query := `SELECT id, username, password, role, status, created_at, updated_at FROM otter.users ORDER BY username`
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -111,19 +116,19 @@ func (s *PostgresStore) ListUsers(ctx context.Context) ([]*model.User, error) {
 }
 
 func (s *PostgresStore) UpdateUser(ctx context.Context, user *model.User) error {
-	query := `UPDATE users SET password = $1, role = $2, status = $3, updated_at = $4 WHERE username = $5`
+	query := `UPDATE otter.users SET password = $1, role = $2, status = $3, updated_at = $4 WHERE username = $5`
 	_, err := s.db.ExecContext(ctx, query, user.Password, user.Role, user.Status, user.UpdatedAt, user.Username)
 	return err
 }
 
 func (s *PostgresStore) DeleteUser(ctx context.Context, username string) error {
-	query := `DELETE FROM users WHERE username = $1`
+	query := `DELETE FROM otter.users WHERE username = $1`
 	_, err := s.db.ExecContext(ctx, query, username)
 	return err
 }
 
 func (s *PostgresStore) Get(ctx context.Context, namespace, group, key string) (*model.Config, error) {
-	query := `SELECT namespace, "group", key, value, version, created_at, updated_at FROM configs WHERE namespace = $1 AND "group" = $2 AND key = $3`
+	query := `SELECT namespace, "group", key, value, version, created_at, updated_at FROM otter.configs WHERE namespace = $1 AND "group" = $2 AND key = $3`
 	row := s.db.QueryRowContext(ctx, query, namespace, group, key)
 
 	var cfg model.Config
@@ -138,7 +143,7 @@ func (s *PostgresStore) Get(ctx context.Context, namespace, group, key string) (
 
 func (s *PostgresStore) Put(ctx context.Context, config *model.Config) error {
 	query := `
-	INSERT INTO configs (namespace, "group", key, value, version, created_at, updated_at)
+	INSERT INTO otter.configs (namespace, "group", key, value, version, created_at, updated_at)
 	VALUES ($1, $2, $3, $4, $5, $6, $7)
 	ON CONFLICT(namespace, "group", key) DO UPDATE SET
 		value = excluded.value,
@@ -150,13 +155,13 @@ func (s *PostgresStore) Put(ctx context.Context, config *model.Config) error {
 }
 
 func (s *PostgresStore) Delete(ctx context.Context, namespace, group, key string) error {
-	query := `DELETE FROM configs WHERE namespace = $1 AND "group" = $2 AND key = $3`
+	query := `DELETE FROM otter.configs WHERE namespace = $1 AND "group" = $2 AND key = $3`
 	_, err := s.db.ExecContext(ctx, query, namespace, group, key)
 	return err
 }
 
 func (s *PostgresStore) List(ctx context.Context, namespace, group string) ([]*model.Config, error) {
-	query := `SELECT namespace, "group", key, value, version, created_at, updated_at FROM configs WHERE namespace = $1 AND "group" = $2`
+	query := `SELECT namespace, "group", key, value, version, created_at, updated_at FROM otter.configs WHERE namespace = $1 AND "group" = $2`
 	rows, err := s.db.QueryContext(ctx, query, namespace, group)
 	if err != nil {
 		return nil, err
@@ -176,7 +181,7 @@ func (s *PostgresStore) List(ctx context.Context, namespace, group string) ([]*m
 
 func (s *PostgresStore) CreateHistory(ctx context.Context, history *model.ConfigHistory) error {
 	query := `
-	INSERT INTO config_history (namespace, "group", key, value, version, op_type, created_at)
+	INSERT INTO otter.config_history (namespace, "group", key, value, version, op_type, created_at)
 	VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 	_, err := s.db.ExecContext(ctx, query, history.Namespace, history.Group, history.Key, history.Value, history.Version, history.OpType, history.CreatedAt)
@@ -184,7 +189,7 @@ func (s *PostgresStore) CreateHistory(ctx context.Context, history *model.Config
 }
 
 func (s *PostgresStore) ListHistory(ctx context.Context, namespace, group, key string) ([]*model.ConfigHistory, error) {
-	query := `SELECT id, namespace, "group", key, value, version, op_type, created_at FROM config_history WHERE namespace = $1 AND "group" = $2 AND key = $3 ORDER BY version DESC`
+	query := `SELECT id, namespace, "group", key, value, version, op_type, created_at FROM otter.config_history WHERE namespace = $1 AND "group" = $2 AND key = $3 ORDER BY version DESC`
 	rows, err := s.db.QueryContext(ctx, query, namespace, group, key)
 	if err != nil {
 		return nil, err
@@ -203,7 +208,7 @@ func (s *PostgresStore) ListHistory(ctx context.Context, namespace, group, key s
 }
 
 func (s *PostgresStore) ListNamespaces(ctx context.Context) ([]string, error) {
-	query := `SELECT name FROM namespaces ORDER BY name`
+	query := `SELECT name FROM otter.namespaces ORDER BY name`
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -222,7 +227,7 @@ func (s *PostgresStore) ListNamespaces(ctx context.Context) ([]string, error) {
 }
 
 func (s *PostgresStore) CreateNamespace(ctx context.Context, namespace string) error {
-	query := `INSERT INTO namespaces (name) VALUES ($1)`
+	query := `INSERT INTO otter.namespaces (name) VALUES ($1)`
 	_, err := s.db.ExecContext(ctx, query, namespace)
 	return err
 }
@@ -232,7 +237,7 @@ func (s *PostgresStore) DeleteNamespace(ctx context.Context, namespace string) e
 		return fmt.Errorf("cannot delete default public namespace")
 	}
 
-	query := `DELETE FROM namespaces WHERE name = $1`
+	query := `DELETE FROM otter.namespaces WHERE name = $1`
 	_, err := s.db.ExecContext(ctx, query, namespace)
 	return err
 }
