@@ -1,5 +1,9 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { Config } from '../../types';
+import CodeMirror from '@uiw/react-codemirror';
+import { StreamLanguage } from '@codemirror/language';
+import { properties } from '@codemirror/legacy-modes/mode/properties';
+import { json } from '@codemirror/lang-json';
 
 interface ConfigFormProps {
   initialConfig?: Config | null;
@@ -207,14 +211,20 @@ const ConfigForm: React.FC<ConfigFormProps> = React.memo(
         <div className="form-row">
           <div className="form-group">
             <label htmlFor="value">Value:</label>
-            <textarea
-              id="value"
-              rows={8}
-              placeholder="Enter config value"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              style={error ? { borderColor: '#ff4d4f' } : {}}
-            />
+            <div style={error ? { border: '1px solid #ff4d4f', borderRadius: '4px' } : {}}>
+              <CodeMirror
+                value={value}
+                height="400px"
+                extensions={[
+                  type === 'json'
+                    ? json()
+                    : type === 'properties'
+                      ? StreamLanguage.define(properties)
+                      : [],
+                ]}
+                onChange={(val) => setValue(val)}
+              />
+            </div>
             {error && (
               <div
                 className="error-message"
