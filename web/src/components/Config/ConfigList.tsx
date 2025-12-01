@@ -24,7 +24,7 @@ const ConfigList: React.FC<ConfigListProps> = React.memo(
         );
       }
 
-      if (configs.length === 0) {
+      if (!configs || configs.length === 0) {
         return (
           <tr>
             <td colSpan={5} className="no-data">

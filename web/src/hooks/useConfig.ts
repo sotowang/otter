@@ -168,7 +168,7 @@ export const useConfig = () => {
         const history = await configAPI.getConfigHistory(namespace, group, key);
         setConfigState((prev) => ({
           ...prev,
-          configHistory: history,
+          configHistory: history || [], // 确保始终是数组，即使API返回null
           isHistoryLoading: false,
         }));
 

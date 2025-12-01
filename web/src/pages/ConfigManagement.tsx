@@ -117,9 +117,9 @@ const ConfigManagement: React.FC = () => {
   };
 
   // 回滚配置
-  const handleRollbackConfig = (version: number) => {
+  const handleRollbackConfig = (version: string) => {
     if (selectedHistoryConfig) {
-      rollbackConfig(namespace, group, selectedHistoryConfig.key, version);
+      rollbackConfig(namespace, group, selectedHistoryConfig.key, parseInt(version, 10));
       closeHistoryModal();
     }
   };
@@ -317,7 +317,7 @@ const ConfigManagement: React.FC = () => {
                   <span className="loading"></span> Loading history...
                 </td>
               </tr>
-            ) : configHistory.length === 0 ? (
+            ) : (configHistory || []).length === 0 ? (
               <tr>
                 <td
                   colSpan={5}
@@ -331,7 +331,7 @@ const ConfigManagement: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              configHistory.map((history: ConfigHistory) => (
+              (configHistory || []).map((history: ConfigHistory) => (
                 <tr key={history.version}>
                   <td>{history.version}</td>
                   <td>{history.value}</td>

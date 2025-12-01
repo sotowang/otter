@@ -16,7 +16,8 @@ export interface ConfigHistory {
   group: string;
   key: string;
   value: string;
-  version: number;
+  type: string;
+  version: string; // 使用string类型以支持大整数，避免JavaScript number精度问题
   op_type: string;
   created_at: string;
 }

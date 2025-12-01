@@ -154,7 +154,7 @@ export const configAPI = {
       {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ version }),
+        body: JSON.stringify({ version: version.toString() }), // 将version转换为字符串，避免JavaScript大整数精度问题
       }
     );
 

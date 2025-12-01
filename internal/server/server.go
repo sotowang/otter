@@ -380,10 +380,23 @@ func (s *Server) getConfig(w http.ResponseWriter, r *http.Request, namespace, gr
 func (s *Server) putConfig(w http.ResponseWriter, r *http.Request, namespace, group, key string) {
 	var req struct {
 		Value string `json:"value"`
+		Type  string `json:"type"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
+	}
+
+	// Get username from context
+	username := "system"
+	if user, ok := r.Context().Value("username").(string); ok {
+		username = user
+	}
+
+	// Set default type if not provided
+	configType := req.Type
+	if configType == "" {
+		configType = "text"
 	}
 
 	cfg := &model.Config{
@@ -391,7 +404,10 @@ func (s *Server) putConfig(w http.ResponseWriter, r *http.Request, namespace, gr
 		Group:     group,
 		Key:       key,
 		Value:     req.Value,
-		Version:   time.Now().UnixNano(),
+		Type:      configType,
+		Version:   time.Now().Unix(),
+		CreatedBy: username,
+		UpdatedBy: username,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -407,6 +423,7 @@ func (s *Server) putConfig(w http.ResponseWriter, r *http.Request, namespace, gr
 		Group:     group,
 		Key:       key,
 		Value:     req.Value,
+		Type:      cfg.Type,
 		Version:   cfg.Version,
 		OpType:    "UPDATE",
 		CreatedAt: time.Now(),
@@ -435,7 +452,8 @@ func (s *Server) deleteConfig(w http.ResponseWriter, r *http.Request, namespace,
 		Group:     group,
 		Key:       key,
 		Value:     "",
-		Version:   time.Now().UnixNano(),
+		Type:      "",
+		Version:   time.Now().Unix(),
 		OpType:    "DELETE",
 		CreatedAt: time.Now(),
 	}
@@ -467,10 +485,17 @@ func (s *Server) listHistory(w http.ResponseWriter, r *http.Request, namespace, 
 
 func (s *Server) rollbackConfig(w http.ResponseWriter, r *http.Request, namespace, group, key string) {
 	var req struct {
-		Version int64 `json:"version"`
+		Version json.Number `json:"version"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// 将字符串转换为int64
+	version, err := req.Version.Int64()
+	if err != nil {
+		http.Error(w, "invalid version format", http.StatusBadRequest)
 		return
 	}
 
@@ -483,7 +508,7 @@ func (s *Server) rollbackConfig(w http.ResponseWriter, r *http.Request, namespac
 
 	var target *model.ConfigHistory
 	for _, h := range histories {
-		if h.Version == req.Version {
+		if h.Version == version {
 			target = h
 			break
 		}
@@ -494,13 +519,22 @@ func (s *Server) rollbackConfig(w http.ResponseWriter, r *http.Request, namespac
 		return
 	}
 
+	// Get username from context
+	username := "system"
+	if user, ok := r.Context().Value("username").(string); ok {
+		username = user
+	}
+
 	// Restore config
 	cfg := &model.Config{
 		Namespace: namespace,
 		Group:     group,
 		Key:       key,
 		Value:     target.Value,
-		Version:   time.Now().UnixNano(), // New version for the rollback
+		Type:      target.Type,       // 从历史记录中获取类型
+		Version:   time.Now().Unix(), // New version for the rollback
+		CreatedBy: username,
+		UpdatedBy: username,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -516,6 +550,7 @@ func (s *Server) rollbackConfig(w http.ResponseWriter, r *http.Request, namespac
 		Group:     group,
 		Key:       key,
 		Value:     target.Value,
+		Type:      cfg.Type,
 		Version:   cfg.Version,
 		OpType:    "ROLLBACK",
 		CreatedAt: time.Now(),
@@ -862,13 +897,21 @@ func (s *Server) putConfigHandler(c *gin.Context) {
 		}
 	}
 
+	// Get username from context
+	username := "system"
+	if user, ok := c.Request.Context().Value("username").(string); ok {
+		username = user
+	}
+
 	config := &model.Config{
 		Namespace: namespace,
 		Group:     group,
 		Key:       key,
 		Value:     req.Value,
 		Type:      configType,
-		Version:   time.Now().UnixNano(),
+		Version:   time.Now().Unix(),
+		CreatedBy: username,
+		UpdatedBy: username,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -885,6 +928,7 @@ func (s *Server) putConfigHandler(c *gin.Context) {
 		Group:     group,
 		Key:       key,
 		Value:     req.Value,
+		Type:      config.Type,
 		Version:   config.Version,
 		OpType:    "UPDATE",
 		CreatedAt: time.Now(),
@@ -915,7 +959,8 @@ func (s *Server) deleteConfigHandler(c *gin.Context) {
 		Group:     group,
 		Key:       key,
 		Value:     "",
-		Version:   time.Now().UnixNano(),
+		Type:      "",
+		Version:   time.Now().Unix(),
 		OpType:    "DELETE",
 		CreatedAt: time.Now(),
 	}
@@ -968,11 +1013,18 @@ func (s *Server) rollbackConfigHandler(c *gin.Context) {
 	key := c.Param("key")
 
 	var req struct {
-		Version int64 `json:"version" binding:"required"`
+		Version json.Number `json:"version" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	// 将字符串转换为int64
+	version, err := req.Version.Int64()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid version format"})
 		return
 	}
 
@@ -986,7 +1038,7 @@ func (s *Server) rollbackConfigHandler(c *gin.Context) {
 
 	var target *model.ConfigHistory
 	for _, h := range histories {
-		if h.Version == req.Version {
+		if h.Version == version {
 			target = h
 			break
 		}
@@ -997,13 +1049,22 @@ func (s *Server) rollbackConfigHandler(c *gin.Context) {
 		return
 	}
 
+	// Get username from context
+	username := "system"
+	if user, ok := c.Request.Context().Value("username").(string); ok {
+		username = user
+	}
+
 	// Restore config
 	config := &model.Config{
 		Namespace: namespace,
 		Group:     group,
 		Key:       key,
 		Value:     target.Value,
-		Version:   time.Now().UnixNano(), // New version for the rollback
+		Type:      target.Type,       // 从历史记录中获取类型
+		Version:   time.Now().Unix(), // New version for the rollback
+		CreatedBy: username,
+		UpdatedBy: username,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -1020,6 +1081,7 @@ func (s *Server) rollbackConfigHandler(c *gin.Context) {
 		Group:     group,
 		Key:       key,
 		Value:     target.Value,
+		Type:      config.Type,
 		Version:   config.Version,
 		OpType:    "ROLLBACK",
 		CreatedAt: time.Now(),

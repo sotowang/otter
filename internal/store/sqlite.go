@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"otter/internal/model"
@@ -36,7 +37,10 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 		"group" TEXT,
 		key TEXT,
 		value TEXT,
+		type TEXT DEFAULT 'text',
 		version INTEGER,
+		created_by TEXT DEFAULT 'system',
+		updated_by TEXT DEFAULT 'system',
 		created_at DATETIME,
 		updated_at DATETIME,
 		PRIMARY KEY (namespace, "group", key)
@@ -47,6 +51,7 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 		"group" TEXT,
 		key TEXT,
 		value TEXT,
+		type TEXT DEFAULT 'text',
 		version INTEGER,
 		op_type TEXT,
 		created_at DATETIME
@@ -65,6 +70,16 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 	`
 	if _, err := db.Exec(query); err != nil {
 		return nil, err
+	}
+
+	// Add type column to config_history if it doesn't exist
+	// SQLite doesn't support IF NOT EXISTS for ALTER TABLE, so we use a try-catch approach
+	alterQuery := `ALTER TABLE config_history ADD COLUMN type TEXT DEFAULT 'text'`
+	if _, err := db.Exec(alterQuery); err != nil {
+		// Ignore error if column already exists
+		if !strings.Contains(err.Error(), "duplicate column name") {
+			return nil, err
+		}
 	}
 
 	return &SQLiteStore{db: db}, nil
@@ -123,11 +138,11 @@ func (s *SQLiteStore) DeleteUser(ctx context.Context, username string) error {
 }
 
 func (s *SQLiteStore) Get(ctx context.Context, namespace, group, key string) (*model.Config, error) {
-	query := `SELECT namespace, "group", key, value, version, created_at, updated_at FROM configs WHERE namespace = ? AND "group" = ? AND key = ?`
+	query := `SELECT namespace, "group", key, value, type, version, created_by, updated_by, created_at, updated_at FROM configs WHERE namespace = ? AND "group" = ? AND key = ?`
 	row := s.db.QueryRowContext(ctx, query, namespace, group, key)
 
 	var cfg model.Config
-	if err := row.Scan(&cfg.Namespace, &cfg.Group, &cfg.Key, &cfg.Value, &cfg.Version, &cfg.CreatedAt, &cfg.UpdatedAt); err != nil {
+	if err := row.Scan(&cfg.Namespace, &cfg.Group, &cfg.Key, &cfg.Value, &cfg.Type, &cfg.Version, &cfg.CreatedBy, &cfg.UpdatedBy, &cfg.CreatedAt, &cfg.UpdatedAt); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound
 		}
@@ -138,14 +153,16 @@ func (s *SQLiteStore) Get(ctx context.Context, namespace, group, key string) (*m
 
 func (s *SQLiteStore) Put(ctx context.Context, config *model.Config) error {
 	query := `
-	INSERT INTO configs (namespace, "group", key, value, version, created_at, updated_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO configs (namespace, "group", key, value, type, version, created_by, updated_by, created_at, updated_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(namespace, "group", key) DO UPDATE SET
 		value = excluded.value,
+		type = excluded.type,
 		version = excluded.version,
+		updated_by = excluded.updated_by,
 		updated_at = excluded.updated_at;
 	`
-	_, err := s.db.ExecContext(ctx, query, config.Namespace, config.Group, config.Key, config.Value, config.Version, config.CreatedAt, config.UpdatedAt)
+	_, err := s.db.ExecContext(ctx, query, config.Namespace, config.Group, config.Key, config.Value, config.Type, config.Version, config.CreatedBy, config.UpdatedBy, config.CreatedAt, config.UpdatedAt)
 	return err
 }
 
@@ -156,7 +173,7 @@ func (s *SQLiteStore) Delete(ctx context.Context, namespace, group, key string) 
 }
 
 func (s *SQLiteStore) List(ctx context.Context, namespace, group string) ([]*model.Config, error) {
-	query := `SELECT namespace, "group", key, value, version, created_at, updated_at FROM configs WHERE namespace = ? AND "group" = ?`
+	query := `SELECT namespace, "group", key, value, type, version, created_by, updated_by, created_at, updated_at FROM configs WHERE namespace = ? AND "group" = ?`
 	rows, err := s.db.QueryContext(ctx, query, namespace, group)
 	if err != nil {
 		return nil, err
@@ -166,7 +183,7 @@ func (s *SQLiteStore) List(ctx context.Context, namespace, group string) ([]*mod
 	var configs []*model.Config
 	for rows.Next() {
 		var cfg model.Config
-		if err := rows.Scan(&cfg.Namespace, &cfg.Group, &cfg.Key, &cfg.Value, &cfg.Version, &cfg.CreatedAt, &cfg.UpdatedAt); err != nil {
+		if err := rows.Scan(&cfg.Namespace, &cfg.Group, &cfg.Key, &cfg.Value, &cfg.Type, &cfg.Version, &cfg.CreatedBy, &cfg.UpdatedBy, &cfg.CreatedAt, &cfg.UpdatedAt); err != nil {
 			return nil, err
 		}
 		configs = append(configs, &cfg)

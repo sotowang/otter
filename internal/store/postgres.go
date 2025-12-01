@@ -46,7 +46,10 @@ func NewPostgresStore(dsn string) (*PostgresStore, error) {
 		"group" TEXT,
 		key TEXT,
 		value TEXT,
+		type TEXT DEFAULT 'text',
 		version BIGINT,
+		created_by TEXT DEFAULT 'system',
+		updated_by TEXT DEFAULT 'system',
 		created_at TIMESTAMP WITH TIME ZONE,
 		updated_at TIMESTAMP WITH TIME ZONE,
 		PRIMARY KEY (namespace, "group", key)
@@ -61,6 +64,13 @@ func NewPostgresStore(dsn string) (*PostgresStore, error) {
 		op_type TEXT,
 		created_at TIMESTAMP WITH TIME ZONE
 	);
+	-- Add type column to config_history if it doesn't exist
+	DO $$ 
+	BEGIN 
+		IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'otter' AND table_name = 'config_history' AND column_name = 'type') THEN 
+			ALTER TABLE otter.config_history ADD COLUMN type TEXT DEFAULT 'text'; 
+		END IF; 
+	END $$;
 	CREATE TABLE IF NOT EXISTS otter.users (
 		id SERIAL PRIMARY KEY,
 		username TEXT UNIQUE,
@@ -133,11 +143,11 @@ func (s *PostgresStore) DeleteUser(ctx context.Context, username string) error {
 }
 
 func (s *PostgresStore) Get(ctx context.Context, namespace, group, key string) (*model.Config, error) {
-	query := `SELECT namespace, "group", key, value, version, created_at, updated_at FROM otter.configs WHERE namespace = $1 AND "group" = $2 AND key = $3`
+	query := `SELECT namespace, "group", key, value, type, version, created_by, updated_by, created_at, updated_at FROM otter.configs WHERE namespace = $1 AND "group" = $2 AND key = $3`
 	row := s.db.QueryRowContext(ctx, query, namespace, group, key)
 
 	var cfg model.Config
-	if err := row.Scan(&cfg.Namespace, &cfg.Group, &cfg.Key, &cfg.Value, &cfg.Version, &cfg.CreatedAt, &cfg.UpdatedAt); err != nil {
+	if err := row.Scan(&cfg.Namespace, &cfg.Group, &cfg.Key, &cfg.Value, &cfg.Type, &cfg.Version, &cfg.CreatedBy, &cfg.UpdatedBy, &cfg.CreatedAt, &cfg.UpdatedAt); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound
 		}
@@ -148,14 +158,16 @@ func (s *PostgresStore) Get(ctx context.Context, namespace, group, key string) (
 
 func (s *PostgresStore) Put(ctx context.Context, config *model.Config) error {
 	query := `
-	INSERT INTO otter.configs (namespace, "group", key, value, version, created_at, updated_at)
-	VALUES ($1, $2, $3, $4, $5, $6, $7)
+	INSERT INTO otter.configs (namespace, "group", key, value, type, version, created_by, updated_by, created_at, updated_at)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	ON CONFLICT(namespace, "group", key) DO UPDATE SET
 		value = excluded.value,
+		type = excluded.type,
 		version = excluded.version,
+		updated_by = excluded.updated_by,
 		updated_at = excluded.updated_at;
 	`
-	_, err := s.db.ExecContext(ctx, query, config.Namespace, config.Group, config.Key, config.Value, config.Version, config.CreatedAt, config.UpdatedAt)
+	_, err := s.db.ExecContext(ctx, query, config.Namespace, config.Group, config.Key, config.Value, config.Type, config.Version, config.CreatedBy, config.UpdatedBy, config.CreatedAt, config.UpdatedAt)
 	return err
 }
 
@@ -166,7 +178,7 @@ func (s *PostgresStore) Delete(ctx context.Context, namespace, group, key string
 }
 
 func (s *PostgresStore) List(ctx context.Context, namespace, group string) ([]*model.Config, error) {
-	query := `SELECT namespace, "group", key, value, version, created_at, updated_at FROM otter.configs WHERE namespace = $1 AND "group" = $2`
+	query := `SELECT namespace, "group", key, value, type, version, created_by, updated_by, created_at, updated_at FROM otter.configs WHERE namespace = $1 AND "group" = $2`
 	rows, err := s.db.QueryContext(ctx, query, namespace, group)
 	if err != nil {
 		return nil, err
@@ -176,7 +188,7 @@ func (s *PostgresStore) List(ctx context.Context, namespace, group string) ([]*m
 	var configs []*model.Config
 	for rows.Next() {
 		var cfg model.Config
-		if err := rows.Scan(&cfg.Namespace, &cfg.Group, &cfg.Key, &cfg.Value, &cfg.Version, &cfg.CreatedAt, &cfg.UpdatedAt); err != nil {
+		if err := rows.Scan(&cfg.Namespace, &cfg.Group, &cfg.Key, &cfg.Value, &cfg.Type, &cfg.Version, &cfg.CreatedBy, &cfg.UpdatedBy, &cfg.CreatedAt, &cfg.UpdatedAt); err != nil {
 			return nil, err
 		}
 		configs = append(configs, &cfg)
@@ -186,15 +198,15 @@ func (s *PostgresStore) List(ctx context.Context, namespace, group string) ([]*m
 
 func (s *PostgresStore) CreateHistory(ctx context.Context, history *model.ConfigHistory) error {
 	query := `
-	INSERT INTO otter.config_history (namespace, "group", key, value, version, op_type, created_at)
-	VALUES ($1, $2, $3, $4, $5, $6, $7)
+	INSERT INTO otter.config_history (namespace, "group", key, value, type, version, op_type, created_at)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
-	_, err := s.db.ExecContext(ctx, query, history.Namespace, history.Group, history.Key, history.Value, history.Version, history.OpType, history.CreatedAt)
+	_, err := s.db.ExecContext(ctx, query, history.Namespace, history.Group, history.Key, history.Value, history.Type, history.Version, history.OpType, history.CreatedAt)
 	return err
 }
 
 func (s *PostgresStore) ListHistory(ctx context.Context, namespace, group, key string) ([]*model.ConfigHistory, error) {
-	query := `SELECT id, namespace, "group", key, value, version, op_type, created_at FROM otter.config_history WHERE namespace = $1 AND "group" = $2 AND key = $3 ORDER BY version DESC`
+	query := `SELECT id, namespace, "group", key, value, type, version, op_type, created_at FROM otter.config_history WHERE namespace = $1 AND "group" = $2 AND key = $3 ORDER BY version DESC`
 	rows, err := s.db.QueryContext(ctx, query, namespace, group, key)
 	if err != nil {
 		return nil, err
@@ -204,7 +216,7 @@ func (s *PostgresStore) ListHistory(ctx context.Context, namespace, group, key s
 	var histories []*model.ConfigHistory
 	for rows.Next() {
 		var h model.ConfigHistory
-		if err := rows.Scan(&h.ID, &h.Namespace, &h.Group, &h.Key, &h.Value, &h.Version, &h.OpType, &h.CreatedAt); err != nil {
+		if err := rows.Scan(&h.ID, &h.Namespace, &h.Group, &h.Key, &h.Value, &h.Type, &h.Version, &h.OpType, &h.CreatedAt); err != nil {
 			return nil, err
 		}
 		histories = append(histories, &h)
