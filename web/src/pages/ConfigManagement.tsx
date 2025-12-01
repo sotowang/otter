@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import AppLayout from '../components/Layout/AppLayout';
+import React, { useState, useEffect, useCallback } from 'react';
 import ConfigList from '../components/Config/ConfigList';
 import ConfigForm from '../components/Config/ConfigForm';
 import Modal from '../components/Common/Modal';
@@ -39,6 +38,9 @@ const ConfigManagement: React.FC = () => {
   const [selectedConfigKeys, setSelectedConfigKeys] = useState<string[]>([]);
   const [overwriteConfigs, setOverwriteConfigs] = useState(false);
   const [isCloneLoading, setIsCloneLoading] = useState(false);
+  // 查询相关状态
+  const [searchKey, setSearchKey] = useState('');
+  const [isPrefixMatch, setIsPrefixMatch] = useState(false);
 
   // 加载命名空间列表
   useEffect(() => {
@@ -119,7 +121,12 @@ const ConfigManagement: React.FC = () => {
   // 回滚配置
   const handleRollbackConfig = (version: string) => {
     if (selectedHistoryConfig) {
-      rollbackConfig(namespace, group, selectedHistoryConfig.key, parseInt(version, 10));
+      rollbackConfig(
+        namespace,
+        group,
+        selectedHistoryConfig.key,
+        parseInt(version, 10)
+      );
       closeHistoryModal();
     }
   };
@@ -200,6 +207,34 @@ const ConfigManagement: React.FC = () => {
     setSelectedConfigKeys([]);
   };
 
+  // 查询配置 - 现在只用于触发搜索按钮的点击事件，实际过滤逻辑在useMemo中
+  const handleSearch = useCallback(() => {
+    // 由于我们使用useMemo实时过滤，这里不需要做任何操作
+    // 可以保留这个函数，以便未来扩展为API调用
+  }, []);
+
+  // 清空查询条件
+  const handleClearSearch = useCallback(() => {
+    setSearchKey('');
+    setIsPrefixMatch(false);
+  }, []);
+
+  // 过滤后的配置列表
+  const filteredConfigs = React.useMemo(() => {
+    if (searchKey.trim() === '') {
+      return configs;
+    }
+    
+    const key = searchKey.trim();
+    return configs.filter(config => {
+      if (isPrefixMatch) {
+        return config.key.startsWith(key);
+      } else {
+        return config.key === key;
+      }
+    });
+  }, [configs, searchKey, isPrefixMatch]);
+
   return (
     <div className="config-management-container">
       <h2>Config Management</h2>
@@ -232,9 +267,53 @@ const ConfigManagement: React.FC = () => {
         </button>
       </div>
 
+      <div className="search-section">
+        <div className="search-input-group">
+          <input
+            type="text"
+            id="searchKey"
+            placeholder="Enter config key to search"
+            value={searchKey}
+            onChange={(e) => setSearchKey(e.target.value)}
+            className="search-input"
+          />
+          <div className="search-options">
+            <label className="prefix-match-label">
+              <input
+                type="checkbox"
+                checked={isPrefixMatch}
+                onChange={(e) => setIsPrefixMatch(e.target.checked)}
+              />
+              Prefix Match
+            </label>
+          </div>
+        </div>
+        <div className="search-actions">
+          <button
+            onClick={handleSearch}
+            className="btn btn-primary search-btn"
+          >
+            Search
+          </button>
+          <button
+            onClick={handleClearSearch}
+            className="btn btn-secondary clear-btn"
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+
       <div className="configs-section">
         <div className="configs-header">
-          <h3>Configs</h3>
+          <div className="configs-header-left">
+            <h3>Configs</h3>
+            {searchKey.trim() && (
+              <span className="search-result-count">
+                Found {filteredConfigs.length} matching config(s)
+              </span>
+            )}
+          </div>
           <div className="config-actions">
             <button
               type="button"
@@ -253,7 +332,7 @@ const ConfigManagement: React.FC = () => {
           </div>
         </div>
         <ConfigList
-          configs={configs}
+          configs={filteredConfigs}
           isLoading={isLoading}
           onEdit={openEditConfigModal}
           onHistory={handleShowHistory}
