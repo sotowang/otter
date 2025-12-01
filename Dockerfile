@@ -35,7 +35,7 @@ COPY . .
 COPY --from=frontend-builder /app/web/dist ./web
 
 # 构建应用程序
-RUN CGO_ENABLED=0 GOOS=linux go build -o otter main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -o otter main.go
 
 # 第三阶段：最终镜像
 FROM alpine:latest

@@ -4,3 +4,4 @@ otter
 .trae/
 main
 docker-compose.override.yml
+deploy.sh
