@@ -1130,17 +1130,45 @@ func (s *Server) updateUserHandler(c *gin.Context) {
 func (s *Server) deleteUserHandler(c *gin.Context) {
 	username := c.Param("username")
 
-	// Prevent deleting admin user
-	if username == "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot delete admin user"})
-		return
-	}
-
-	if err := s.store.DeleteUser(c.Request.Context(), username); err != nil {
+	// Get the user to be deleted
+	user, err := s.store.GetUser(c.Request.Context(), username)
+	if err != nil {
 		if err == store.ErrNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 			return
 		}
+		s.logger.Error("Failed to get user", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// If the user is an admin, check if there are other admin users
+	if user.Role == "admin" {
+		// Get all users
+		users, err := s.store.ListUsers(c.Request.Context())
+		if err != nil {
+			s.logger.Error("Failed to list users", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Count the number of admin users
+		adminCount := 0
+		for _, u := range users {
+			if u.Role == "admin" {
+				adminCount++
+			}
+		}
+
+		// If this is the last admin user, prevent deletion
+		if adminCount <= 1 {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot delete the last admin user. At least one admin user must remain."})
+			return
+		}
+	}
+
+	// Delete the user
+	if err := s.store.DeleteUser(c.Request.Context(), username); err != nil {
 		s.logger.Error("Failed to delete user", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

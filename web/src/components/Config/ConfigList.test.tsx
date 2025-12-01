@@ -1,4 +1,3 @@
-
 import { render, screen, fireEvent } from '@testing-library/react';
 import ConfigList from './ConfigList';
 import type { Config } from '../../types';

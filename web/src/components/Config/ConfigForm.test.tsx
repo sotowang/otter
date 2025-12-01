@@ -1,4 +1,3 @@
-
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import ConfigForm from './ConfigForm';
@@ -6,7 +5,6 @@ import type { Config } from '../../types';
 
 // 模拟回调函数
 const mockOnSave = jest.fn();
-
 
 describe('ConfigForm Component', () => {
   // 重置模拟函数
@@ -39,12 +37,7 @@ describe('ConfigForm Component', () => {
       updated_at: '2023-01-01T00:00:00Z',
     };
 
-    render(
-      <ConfigForm
-        initialConfig={mockConfig}
-        onSave={mockOnSave}
-      />
-    );
+    render(<ConfigForm initialConfig={mockConfig} onSave={mockOnSave} />);
 
     // 检查表单元素是否填充了初始数据
     expect(screen.getByDisplayValue('test_key')).toBeInTheDocument();

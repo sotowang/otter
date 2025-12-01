@@ -241,7 +241,7 @@ body {
 }
 
 /* 复选框样式 */
-.user-table input[type="checkbox"] {
+.user-table input[type='checkbox'] {
   width: 16px;
   height: 16px;
   cursor: pointer;
@@ -791,7 +791,7 @@ body {
 }
 
 .no-data::before {
-  content: "📄";
+  content: '📄';
   font-size: 48px;
   display: block;
   margin-bottom: 16px;
@@ -808,7 +808,7 @@ body {
 }
 
 .loading::before {
-  content: "";
+  content: '';
   display: inline-block;
   width: 24px;
   height: 24px;
@@ -821,8 +821,12 @@ body {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* 配置表单样式 */
@@ -1027,7 +1031,7 @@ body {
   transform: translateY(-1px);
 }
 
-.config-checkbox-item input[type="checkbox"] {
+.config-checkbox-item input[type='checkbox'] {
   margin-top: 4px;
   flex-shrink: 0;
   width: 18px;
@@ -1873,7 +1877,7 @@ hr {
   box-shadow: 0 2px 8px rgba(24, 144, 255, 0.15);
 }
 
-.config-checkbox-item input[type="checkbox"] {
+.config-checkbox-item input[type='checkbox'] {
   margin-top: 4px;
   flex-shrink: 0;
   width: 16px;

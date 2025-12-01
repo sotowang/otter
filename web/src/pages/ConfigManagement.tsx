@@ -31,7 +31,8 @@ const ConfigManagement: React.FC = () => {
   const [modalTitle, setModalTitle] = useState('Create Config');
   const [selectedConfig, setSelectedConfig] = useState<Config | null>(null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
-  const [selectedHistoryConfig, setSelectedHistoryConfig] = useState<Config | null>(null);
+  const [selectedHistoryConfig, setSelectedHistoryConfig] =
+    useState<Config | null>(null);
   const [isCloneModalOpen, setIsCloneModalOpen] = useState(false);
   const [sourceNamespace, setSourceNamespace] = useState('public');
   const [targetNamespace, setTargetNamespace] = useState('');
@@ -86,7 +87,13 @@ const ConfigManagement: React.FC = () => {
   const handleSaveConfig = async (
     config: Omit<Config, 'version' | 'created_at' | 'updated_at'>
   ) => {
-    const success = await saveConfig(config.namespace, group, config.key, config.value, config.type);
+    const success = await saveConfig(
+      config.namespace,
+      group,
+      config.key,
+      config.value,
+      config.type
+    );
     if (success) {
       closeCreateConfigModal();
       // 如果保存成功，并且当前显示的是保存的namespace，重新加载配置
@@ -140,13 +147,23 @@ const ConfigManagement: React.FC = () => {
 
   // 处理克隆配置
   const handleCloneConfigs = async () => {
-    if (!sourceNamespace || !targetNamespace || selectedConfigKeys.length === 0) {
+    if (
+      !sourceNamespace ||
+      !targetNamespace ||
+      selectedConfigKeys.length === 0
+    ) {
       return;
     }
 
     setIsCloneLoading(true);
     try {
-      const success = await configHook.cloneConfigs(sourceNamespace, targetNamespace, group, selectedConfigKeys, overwriteConfigs);
+      const success = await configHook.cloneConfigs(
+        sourceNamespace,
+        targetNamespace,
+        group,
+        selectedConfigKeys,
+        overwriteConfigs
+      );
       if (success) {
         closeCloneConfigModal();
         // 如果克隆到当前命名空间，重新加载配置
@@ -163,18 +180,18 @@ const ConfigManagement: React.FC = () => {
 
   // 处理配置选择
   const handleConfigSelection = (key: string, isSelected: boolean) => {
-    setSelectedConfigKeys(prev => {
+    setSelectedConfigKeys((prev) => {
       if (isSelected) {
         return [...prev, key];
       } else {
-        return prev.filter(k => k !== key);
+        return prev.filter((k) => k !== key);
       }
     });
   };
 
   // 选择所有配置
   const selectAllConfigs = () => {
-    const allKeys = configs.map(cfg => cfg.key);
+    const allKeys = configs.map((cfg) => cfg.key);
     setSelectedConfigKeys(allKeys);
   };
 
@@ -226,7 +243,11 @@ const ConfigManagement: React.FC = () => {
             >
               Create Config
             </button>
-            <button type="button" onClick={openCloneConfigModal} className="btn btn-primary">
+            <button
+              type="button"
+              onClick={openCloneConfigModal}
+              className="btn btn-primary"
+            >
               Clone Configs
             </button>
           </div>
@@ -260,11 +281,7 @@ const ConfigManagement: React.FC = () => {
           >
             Cancel
           </button>
-          <button
-            type="submit"
-            form="configForm"
-            className="save-btn"
-          >
+          <button type="submit" form="configForm" className="save-btn">
             Save
           </button>
         </div>
@@ -291,7 +308,11 @@ const ConfigManagement: React.FC = () => {
               <tr>
                 <td
                   colSpan={5}
-                  style={{ textAlign: 'center', color: '#999', padding: '20px' }}
+                  style={{
+                    textAlign: 'center',
+                    color: '#999',
+                    padding: '20px',
+                  }}
                 >
                   <span className="loading"></span> Loading history...
                 </td>
@@ -300,7 +321,11 @@ const ConfigManagement: React.FC = () => {
               <tr>
                 <td
                   colSpan={5}
-                  style={{ textAlign: 'center', color: '#999', padding: '20px' }}
+                  style={{
+                    textAlign: 'center',
+                    color: '#999',
+                    padding: '20px',
+                  }}
                 >
                   No history found
                 </td>
@@ -379,7 +404,7 @@ const ConfigManagement: React.FC = () => {
               </select>
             </div>
           </div>
-          
+
           <div className="form-row">
             <div className="form-group">
               <label htmlFor="group">Group:</label>
@@ -395,7 +420,14 @@ const ConfigManagement: React.FC = () => {
           </div>
 
           <div className="config-selection">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '12px',
+              }}
+            >
               <label>Select Configs to Clone:</label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
@@ -414,14 +446,26 @@ const ConfigManagement: React.FC = () => {
                 </button>
               </div>
             </div>
-            
+
             <div className="config-list-container">
               {isLoading ? (
-                <div style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
+                <div
+                  style={{
+                    textAlign: 'center',
+                    color: '#999',
+                    padding: '20px',
+                  }}
+                >
                   <span className="loading"></span> Loading configs...
                 </div>
               ) : configs.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
+                <div
+                  style={{
+                    textAlign: 'center',
+                    color: '#999',
+                    padding: '20px',
+                  }}
+                >
                   No configs found
                 </div>
               ) : (
@@ -432,7 +476,9 @@ const ConfigManagement: React.FC = () => {
                         type="checkbox"
                         id={`clone_${config.key}`}
                         checked={selectedConfigKeys.includes(config.key)}
-                        onChange={(e) => handleConfigSelection(config.key, e.target.checked)}
+                        onChange={(e) =>
+                          handleConfigSelection(config.key, e.target.checked)
+                        }
                       />
                       <label htmlFor={`clone_${config.key}`}>
                         <div className="config-info">
@@ -448,7 +494,10 @@ const ConfigManagement: React.FC = () => {
           </div>
 
           <div className="form-row">
-            <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div
+              className="form-group"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
               <input
                 type="checkbox"
                 id="overwriteConfigs"
@@ -474,7 +523,11 @@ const ConfigManagement: React.FC = () => {
             type="button"
             className="save-btn"
             onClick={handleCloneConfigs}
-            disabled={isCloneLoading || selectedConfigKeys.length === 0 || !targetNamespace}
+            disabled={
+              isCloneLoading ||
+              selectedConfigKeys.length === 0 ||
+              !targetNamespace
+            }
           >
             {isCloneLoading ? (
               <>
@@ -486,8 +539,6 @@ const ConfigManagement: React.FC = () => {
           </button>
         </div>
       </Modal>
-
-
     </div>
   );
 };

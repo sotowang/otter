@@ -9,7 +9,10 @@ const UserManagement: React.FC = () => {
   const [showFormModal, setShowFormModal] = useState<boolean>(false);
   const [editingUser, setEditingUser] = useState<User | undefined>(undefined);
   const [loading, setLoading] = useState<boolean>(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   // 显示添加用户表单
@@ -59,7 +62,7 @@ const UserManagement: React.FC = () => {
       setShowFormModal(false);
       setEditingUser(undefined);
       // 触发用户列表刷新
-      setRefreshTrigger(prev => prev + 1);
+      setRefreshTrigger((prev) => prev + 1);
     } catch (error) {
       console.error('Failed to save user:', error);
       setMessage({
@@ -74,12 +77,10 @@ const UserManagement: React.FC = () => {
   return (
     <div className="user-management-container">
       <h2>User Management</h2>
-      
+
       {/* 消息提示 */}
       {message && (
-        <div className={`message message-${message.type}`}>
-          {message.text}
-        </div>
+        <div className={`message message-${message.type}`}>{message.text}</div>
       )}
 
       {/* 用户列表 */}

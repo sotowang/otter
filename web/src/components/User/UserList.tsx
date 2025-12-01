@@ -9,7 +9,11 @@ interface UserListProps {
   refreshTrigger: number;
 }
 
-const UserList: React.FC<UserListProps> = ({ onEditUser, onAddUser, refreshTrigger }) => {
+const UserList: React.FC<UserListProps> = ({
+  onEditUser,
+  onAddUser,
+  refreshTrigger,
+}) => {
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -21,7 +25,9 @@ const UserList: React.FC<UserListProps> = ({ onEditUser, onAddUser, refreshTrigg
   });
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
-  const [deleteTarget, setDeleteTarget] = useState<'single' | 'multiple' | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<
+    'single' | 'multiple' | null
+  >(null);
   const [userToDelete, setUserToDelete] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [usersPerPage] = useState<number>(10);
@@ -51,17 +57,19 @@ const UserList: React.FC<UserListProps> = ({ onEditUser, onAddUser, refreshTrigg
     let result = [...users];
 
     if (searchParams.username) {
-      result = result.filter(user =>
-        user.username.toLowerCase().includes(searchParams.username.toLowerCase())
+      result = result.filter((user) =>
+        user.username
+          .toLowerCase()
+          .includes(searchParams.username.toLowerCase())
       );
     }
 
     if (searchParams.role) {
-      result = result.filter(user => user.role === searchParams.role);
+      result = result.filter((user) => user.role === searchParams.role);
     }
 
     if (searchParams.status) {
-      result = result.filter(user => user.status === searchParams.status);
+      result = result.filter((user) => user.status === searchParams.status);
     }
 
     setFilteredUsers(result);
@@ -75,9 +83,11 @@ const UserList: React.FC<UserListProps> = ({ onEditUser, onAddUser, refreshTrigg
   }, [searchParams, users, currentPage, usersPerPage]);
 
   // 处理搜索参数变化
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleSearchChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
-    setSearchParams(prev => ({ ...prev, [name]: value }));
+    setSearchParams((prev) => ({ ...prev, [name]: value }));
   };
 
   // 处理单个用户删除
@@ -115,9 +125,9 @@ const UserList: React.FC<UserListProps> = ({ onEditUser, onAddUser, refreshTrigg
 
   // 处理用户选择
   const handleUserSelect = (username: string) => {
-    setSelectedUsers(prev => {
+    setSelectedUsers((prev) => {
       if (prev.includes(username)) {
-        return prev.filter(u => u !== username);
+        return prev.filter((u) => u !== username);
       } else {
         return [...prev, username];
       }
@@ -129,7 +139,7 @@ const UserList: React.FC<UserListProps> = ({ onEditUser, onAddUser, refreshTrigg
     if (selectedUsers.length === filteredUsers.length) {
       setSelectedUsers([]);
     } else {
-      setSelectedUsers(filteredUsers.map(user => user.username));
+      setSelectedUsers(filteredUsers.map((user) => user.username));
     }
   };
 
@@ -215,7 +225,10 @@ const UserList: React.FC<UserListProps> = ({ onEditUser, onAddUser, refreshTrigg
                 <th>
                   <input
                     type="checkbox"
-                    checked={selectedUsers.length === filteredUsers.length && filteredUsers.length > 0}
+                    checked={
+                      selectedUsers.length === filteredUsers.length &&
+                      filteredUsers.length > 0
+                    }
                     onChange={handleSelectAll}
                   />
                 </th>
@@ -235,7 +248,7 @@ const UserList: React.FC<UserListProps> = ({ onEditUser, onAddUser, refreshTrigg
                   </td>
                 </tr>
               ) : (
-                currentUsers.map(user => (
+                currentUsers.map((user) => (
                   <tr key={user.username}>
                     <td>
                       <input
@@ -268,7 +281,6 @@ const UserList: React.FC<UserListProps> = ({ onEditUser, onAddUser, refreshTrigg
                         <button
                           className="btn btn-sm btn-danger"
                           onClick={() => handleDeleteUser(user.username)}
-                          disabled={user.username === 'admin'}
                         >
                           Delete
                         </button>
@@ -313,13 +325,15 @@ const UserList: React.FC<UserListProps> = ({ onEditUser, onAddUser, refreshTrigg
       >
         <div className="modal-content">
           <p>
-            {deleteTarget === 'single' 
+            {deleteTarget === 'single'
               ? `Are you sure you want to delete user "${userToDelete}"?`
-              : `Are you sure you want to delete ${selectedUsers.length} selected users?`
-            }
+              : `Are you sure you want to delete ${selectedUsers.length} selected users?`}
           </p>
           <div className="modal-actions">
-            <button className="btn btn-secondary" onClick={() => setShowDeleteModal(false)}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowDeleteModal(false)}
+            >
               Cancel
             </button>
             <button className="btn btn-danger" onClick={confirmDelete}>

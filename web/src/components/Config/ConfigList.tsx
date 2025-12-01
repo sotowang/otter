@@ -17,10 +17,7 @@ const ConfigList: React.FC<ConfigListProps> = React.memo(
       if (isLoading) {
         return (
           <tr>
-            <td
-              colSpan={5}
-              className="loading"
-            >
+            <td colSpan={5} className="loading">
               Loading configs...
             </td>
           </tr>
@@ -30,10 +27,7 @@ const ConfigList: React.FC<ConfigListProps> = React.memo(
       if (configs.length === 0) {
         return (
           <tr>
-            <td
-              colSpan={5}
-              className="no-data"
-            >
+            <td colSpan={5} className="no-data">
               No configs found
             </td>
           </tr>
@@ -41,51 +35,64 @@ const ConfigList: React.FC<ConfigListProps> = React.memo(
       }
 
       // 渲染配置值，根据类型格式化
-    const renderConfigValue = (value: string, type: string) => {
-      if (!value) return '';
-      
-      switch (type) {
-        case 'json':
-          try {
-            const parsed = JSON.parse(value);
-            return (
-              <div className="config-value">
-                <pre className="config-value-json">
-                  {JSON.stringify(parsed, null, 2)}
-                </pre>
-              </div>
-            );
-          } catch (e) {
-            // 如果JSON解析失败，显示原始值
-            return <div className="config-value">{value}</div>;
-          }
-        case 'markdown':
-          try {
-            const html = marked(value);
-            return (
-              <div className="config-value markdown-content">
-                <div dangerouslySetInnerHTML={{ __html: html }} />
-              </div>
-            );
-          } catch (e) {
-            // 如果Markdown渲染失败，显示原始值
-            return <div className="config-value">{value}</div>;
-          }
-        default:
-          return <div className="config-value">{value}</div>;
-      }
-    };
+      const renderConfigValue = (value: string, type: string) => {
+        if (!value) return '';
 
-    return configs.map((cfg) => (
+        switch (type) {
+          case 'json':
+            try {
+              const parsed = JSON.parse(value);
+              return (
+                <div className="config-value">
+                  <pre className="config-value-json">
+                    {JSON.stringify(parsed, null, 2)}
+                  </pre>
+                </div>
+              );
+            } catch (e) {
+              // 如果JSON解析失败，显示原始值
+              return <div className="config-value">{value}</div>;
+            }
+          case 'markdown':
+            try {
+              const html = marked(value);
+              return (
+                <div className="config-value markdown-content">
+                  <div dangerouslySetInnerHTML={{ __html: html }} />
+                </div>
+              );
+            } catch (e) {
+              // 如果Markdown渲染失败，显示原始值
+              return <div className="config-value">{value}</div>;
+            }
+          default:
+            return <div className="config-value">{value}</div>;
+        }
+      };
+
+      return configs.map((cfg) => (
         <tr key={`${cfg.namespace}-${cfg.group}-${cfg.key}`}>
           <td>{cfg.key}</td>
           <td>{renderConfigValue(cfg.value, cfg.type || 'text')}</td>
-          <td><span className="config-type">{cfg.type || 'text'}</span></td>
-          <td className="config-updated-at">{new Date(cfg.updated_at).toLocaleString()}</td>
+          <td>
+            <span className="config-type">{cfg.type || 'text'}</span>
+          </td>
+          <td className="config-updated-at">
+            {new Date(cfg.updated_at).toLocaleString()}
+          </td>
           <td className="config-actions-buttons">
-            <button className="btn btn-primary" onClick={() => onEdit(cfg)}>Edit</button>
-            <button className="btn btn-secondary" onClick={() => onHistory(cfg)}>History</button>
-            <button className="btn btn-danger" onClick={() => onDelete(cfg)}>Delete</button>
+            <button className="btn btn-primary" onClick={() => onEdit(cfg)}>
+              Edit
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => onHistory(cfg)}
+            >
+              History
+            </button>
+            <button className="btn btn-danger" onClick={() => onDelete(cfg)}>
+              Delete
+            </button>
           </td>
         </tr>
       ));

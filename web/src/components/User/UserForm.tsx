@@ -70,15 +70,17 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
   };
 
   // 处理表单字段变化
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
     // 清除对应字段的错误信息
     if (errors[name]) {
-      setErrors(prev => {
+      setErrors((prev) => {
         const newErrors = { ...prev };
         delete newErrors[name];
         return newErrors;
@@ -116,7 +118,9 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
             disabled={!!user} // 编辑时用户名不可修改
             className={errors.username ? 'input-error' : ''}
           />
-          {errors.username && <div className="error-message">{errors.username}</div>}
+          {errors.username && (
+            <div className="error-message">{errors.username}</div>
+          )}
         </div>
 
         <div className="form-group">
@@ -131,7 +135,9 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
             onChange={handleChange}
             className={errors.password ? 'input-error' : ''}
           />
-          {errors.password && <div className="error-message">{errors.password}</div>}
+          {errors.password && (
+            <div className="error-message">{errors.password}</div>
+          )}
         </div>
 
         <div className="form-group">

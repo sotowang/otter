@@ -25,7 +25,7 @@ const ConfigForm: React.FC<ConfigFormProps> = React.memo(
     // 格式化配置值，根据类型
     const formatConfigValue = useCallback((val: string, type: string) => {
       if (!val) return '';
-      
+
       switch (type) {
         case 'json':
           try {
@@ -42,9 +42,15 @@ const ConfigForm: React.FC<ConfigFormProps> = React.memo(
 
     // 初始化状态
     const [key, setKey] = useState(initialConfig?.key || '');
-    const [value, setValue] = useState(initialConfig ? formatConfigValue(initialConfig.value, initialConfig.type) : '');
+    const [value, setValue] = useState(
+      initialConfig
+        ? formatConfigValue(initialConfig.value, initialConfig.type)
+        : ''
+    );
     const [type, setType] = useState(initialConfig?.type || 'text');
-    const [namespace, setNamespace] = useState(initialConfig?.namespace || currentNamespace);
+    const [namespace, setNamespace] = useState(
+      initialConfig?.namespace || currentNamespace
+    );
     const [isEditMode, setIsEditMode] = useState(!!initialConfig);
     const [error, setError] = useState<string | null>(null);
 
@@ -69,22 +75,22 @@ const ConfigForm: React.FC<ConfigFormProps> = React.memo(
       if (!val.trim()) {
         return 'Value cannot be empty';
       }
-      
+
       switch (type) {
         case 'json':
           try {
             // 首先检查基本JSON格式
             const parsed = JSON.parse(val);
-            
+
             // 检查是否为对象
             if (typeof parsed !== 'object' || parsed === null) {
               return 'JSON must be an object';
             }
-            
+
             // 检查重复键
             const keys = new Set<string>();
             let hasDuplicateKeys = false;
-            
+
             // 使用正则表达式查找所有键，检查是否有重复
             const keyRegex = /"([^"]+)":/g;
             let match;
@@ -96,11 +102,11 @@ const ConfigForm: React.FC<ConfigFormProps> = React.memo(
               }
               keys.add(key);
             }
-            
+
             if (hasDuplicateKeys) {
               return 'JSON contains duplicate keys';
             }
-            
+
             return null;
           } catch (e) {
             return 'Invalid JSON format';
@@ -114,14 +120,14 @@ const ConfigForm: React.FC<ConfigFormProps> = React.memo(
     const handleSubmit = useCallback(
       (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         // 验证表单
         const validationError = validateConfigValue(value, type);
         if (validationError) {
           setError(validationError);
           return;
         }
-        
+
         if (key.trim() && value.trim() && namespace) {
           onSave({
             namespace,
@@ -210,8 +216,8 @@ const ConfigForm: React.FC<ConfigFormProps> = React.memo(
               style={error ? { borderColor: '#ff4d4f' } : {}}
             />
             {error && (
-              <div 
-                className="error-message" 
+              <div
+                className="error-message"
                 style={{
                   color: '#ff4d4f',
                   fontSize: '12px',
