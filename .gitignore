@@ -3,3 +3,4 @@ __debug_*
 otter
 .trae/
 main
+docker-compose.override.yml
