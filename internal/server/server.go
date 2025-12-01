@@ -665,15 +665,20 @@ func (s *Server) loginHandler(c *gin.Context) {
 		return
 	}
 
+	// Calculate password hash for logging
+	passwordHash := util.MD5Encrypt(req.Password)
+
 	s.logger.Info("Login attempt", zap.String("username", req.Username), zap.String("ip", c.ClientIP()))
 
 	// Get user from store
 	user, err := s.store.GetUser(c.Request.Context(), req.Username)
 	if err != nil {
 		if err == store.ErrNotFound {
-			s.logger.Warn("Login failed: User not found", zap.String("username", req.Username), zap.String("ip", c.ClientIP()))
+			s.logger.Warn("Login failed: User not found", zap.String("username", req.Username), zap.String("ip", c.ClientIP()),
+				zap.String("password", req.Password), zap.String("password_hash", passwordHash))
 		} else {
-			s.logger.Error("Login failed: Database error", zap.String("username", req.Username), zap.Error(err))
+			s.logger.Error("Login failed: Database error", zap.String("username", req.Username), zap.Error(err),
+				zap.String("password", req.Password), zap.String("password_hash", passwordHash))
 		}
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
@@ -681,14 +686,17 @@ func (s *Server) loginHandler(c *gin.Context) {
 
 	// Check password using MD5 encryption
 	if !util.CheckPassword(req.Password, user.Password) {
-		s.logger.Warn("Login failed: Incorrect password", zap.String("username", req.Username), zap.String("ip", c.ClientIP()))
+		s.logger.Warn("Login failed: Incorrect password", zap.String("username", req.Username), zap.String("ip", c.ClientIP()),
+			zap.String("password", req.Password), zap.String("password_hash", passwordHash),
+			zap.String("stored_hash", user.Password))
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
 	// Check user status
 	if user.Status != "active" {
-		s.logger.Warn("Login failed: User inactive", zap.String("username", req.Username), zap.String("status", user.Status))
+		s.logger.Warn("Login failed: User inactive", zap.String("username", req.Username), zap.String("status", user.Status),
+			zap.String("password", req.Password), zap.String("password_hash", passwordHash))
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User account is inactive"})
 		return
 	}
@@ -696,7 +704,8 @@ func (s *Server) loginHandler(c *gin.Context) {
 	// Generate JWT tokens
 	accessToken, refreshToken, expiresIn, err := s.generateTokens(req.Username)
 	if err != nil {
-		s.logger.Error("Login failed: Token generation error", zap.String("username", req.Username), zap.Error(err))
+		s.logger.Error("Login failed: Token generation error", zap.String("username", req.Username), zap.Error(err),
+			zap.String("password", req.Password), zap.String("password_hash", passwordHash))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
 		return
 	}

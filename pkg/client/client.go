@@ -2,8 +2,11 @@ package client
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -198,6 +201,11 @@ func (c *Client) RefreshToken() error {
 func (c *Client) Login(username, password string) error {
 	startTime := time.Now()
 	url := fmt.Sprintf("%s/api/v1/login", c.endpoint)
+
+	// Calculate password hash for logging
+	hash := sha256.Sum256([]byte(password))
+	passwordHash := hex.EncodeToString(hash[:])
+
 	reqBody, _ := json.Marshal(map[string]string{
 		"username": username,
 		"password": password,
@@ -206,24 +214,28 @@ func (c *Client) Login(username, password string) error {
 	resp, err := c.client.Post(url, "application/json", bytes.NewBuffer(reqBody))
 	if err != nil {
 		c.updateStats(startTime, false)
+		log.Printf("Login failed for user %s: %v, password: %s, password_hash: %s", username, err, password, passwordHash)
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		c.updateStats(startTime, false)
+		log.Printf("Login failed for user %s: status %d, password: %s, password_hash: %s", username, resp.StatusCode, password, passwordHash)
 		return fmt.Errorf("login failed: status %d", resp.StatusCode)
 	}
 
 	var res TokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
 		c.updateStats(startTime, false)
+		log.Printf("Login failed for user %s: failed to decode response %v, password: %s, password_hash: %s", username, err, password, passwordHash)
 		return err
 	}
 
 	c.token = res.AccessToken
 	c.refreshToken = res.RefreshToken
 	c.updateStats(startTime, true)
+	log.Printf("Login successful for user %s, password_hash: %s", username, passwordHash)
 	return nil
 }
 
