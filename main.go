@@ -4,6 +4,7 @@ import (
 	"flag"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"otter/internal/server"
 	"otter/internal/store"
@@ -15,8 +16,16 @@ func main() {
 	jwtSecret := flag.String("jwt-secret", "default-secret-key", "JWT secret key")
 	flag.Parse()
 
-	// Initialize zap logger
-	logger, err := zap.NewProduction()
+	// Initialize zap logger with custom configuration
+	config := zap.NewProductionConfig()
+	// Set timestamp format to ISO8601 with timezone
+	config.EncoderConfig.TimeKey = "ts"
+	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	// Optional: Use custom time format with milliseconds
+	// config.EncoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+	// 	enc.AppendString(t.Format("2006-01-02T15:04:05.000Z07:00"))
+	// }
+	logger, err := config.Build()
 	if err != nil {
 		panic("Failed to initialize logger")
 	}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"otter/internal/store"
+	"otter/internal/util"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -47,8 +48,8 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// In a real app, compare hashed password
-	if user.Password != req.Password {
+	// Compare hashed password
+	if !util.CheckPassword(req.Password, user.Password) {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}

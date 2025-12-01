@@ -13,6 +13,7 @@ import (
 
 	"otter/internal/model"
 	"otter/internal/store"
+	"otter/internal/util"
 )
 
 type Watcher struct {
@@ -171,7 +172,7 @@ func (s *Server) initAdminUser() {
 		// Create admin user if not exists
 		newUser := &model.User{
 			Username:  "admin",
-			Password:  "admin", // Default password
+			Password:  util.MD5Encrypt("admin"), // Default password encrypted with MD5
 			Role:      "admin",
 			Status:    "active",
 			CreatedAt: time.Now(),
@@ -636,8 +637,8 @@ func (s *Server) loginHandler(c *gin.Context) {
 		return
 	}
 
-	// Check password (in production, this should be a proper password comparison)
-	if user.Password != req.Password {
+	// Check password using MD5 encryption
+	if !util.CheckPassword(req.Password, user.Password) {
 		s.logger.Warn("Login failed: Incorrect password", zap.String("username", req.Username), zap.String("ip", c.ClientIP()))
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
@@ -1065,7 +1066,7 @@ func (s *Server) createUserHandler(c *gin.Context) {
 	// Create new user
 	user := &model.User{
 		Username:  req.Username,
-		Password:  req.Password, // In production, this should be hashed
+		Password:  util.MD5Encrypt(req.Password), // Hash password using MD5
 		Role:      req.Role,
 		Status:    req.Status,
 		CreatedAt: time.Now(),
@@ -1110,7 +1111,7 @@ func (s *Server) updateUserHandler(c *gin.Context) {
 
 	// Update user fields
 	if req.Password != "" {
-		user.Password = req.Password // In production, this should be hashed
+		user.Password = util.MD5Encrypt(req.Password) // Hash password using MD5
 	}
 	user.Role = req.Role
 	user.Status = req.Status
