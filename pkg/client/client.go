@@ -42,10 +42,11 @@ type ConnectionStats struct {
 // Client represents a client for the Otter config center
 
 type Client struct {
-	endpoint string
-	token    string
-	client   *http.Client
-	config   ClientConfig
+	endpoint     string
+	token        string
+	refreshToken string
+	client       *http.Client
+	config       ClientConfig
 
 	// Connection statistics
 	mu    sync.Mutex
@@ -148,12 +149,48 @@ func (c *Client) GetConnectionStats() ConnectionStats {
 	return c.stats
 }
 
-// TokenResponse represents the server response for login
+// TokenResponse represents the server response for login and refresh
 
 type TokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	ExpiresIn    int64  `json:"expires_in"`
+}
+
+// RefreshToken refreshes the access token using the refresh token
+func (c *Client) RefreshToken() error {
+	if c.refreshToken == "" {
+		return fmt.Errorf("no refresh token available")
+	}
+
+	startTime := time.Now()
+	url := fmt.Sprintf("%s/api/v1/refresh", c.endpoint)
+	reqBody, _ := json.Marshal(map[string]string{
+		"refresh_token": c.refreshToken,
+	})
+
+	resp, err := c.client.Post(url, "application/json", bytes.NewBuffer(reqBody))
+	if err != nil {
+		c.updateStats(startTime, false)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		c.updateStats(startTime, false)
+		return fmt.Errorf("refresh token failed: status %d", resp.StatusCode)
+	}
+
+	var res TokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		c.updateStats(startTime, false)
+		return err
+	}
+
+	c.token = res.AccessToken
+	c.refreshToken = res.RefreshToken
+	c.updateStats(startTime, true)
+	return nil
 }
 
 // Login authenticates with the server and gets a token
@@ -185,6 +222,7 @@ func (c *Client) Login(username, password string) error {
 	}
 
 	c.token = res.AccessToken
+	c.refreshToken = res.RefreshToken
 	c.updateStats(startTime, true)
 	return nil
 }
@@ -231,22 +269,20 @@ func (c *Client) WatchConfig(namespace, group, key string, callback func(*model.
 	go func() {
 		url := fmt.Sprintf("%s/api/v1/namespaces/%s/groups/%s/configs/%s/watch", c.endpoint, namespace, group, key)
 
-		// Create a custom request with longer timeout for watching
-		req, err := http.NewRequest(http.MethodGet, url, nil)
-		if err != nil {
-			time.Sleep(2 * time.Second)
-			return
-		}
-
-		if c.token != "" {
-			req.Header.Set("Authorization", "Bearer "+c.token)
-		}
-
 		for {
 			startTime := time.Now()
 
-			// Create a copy of the request with the same headers
-			watchReq := req.Clone(req.Context())
+			// Create a new request each time to ensure we use the latest token
+			req, err := http.NewRequest(http.MethodGet, url, nil)
+			if err != nil {
+				c.updateStats(startTime, false)
+				time.Sleep(2 * time.Second)
+				continue
+			}
+
+			if c.token != "" {
+				req.Header.Set("Authorization", "Bearer "+c.token)
+			}
 
 			// Create a custom client with watch timeout for this request only
 			watchClient := &http.Client{
@@ -254,7 +290,7 @@ func (c *Client) WatchConfig(namespace, group, key string, callback func(*model.
 				Timeout:   c.config.WatchTimeout,
 			}
 
-			resp, err := watchClient.Do(watchReq)
+			resp, err := watchClient.Do(req)
 			if err != nil {
 				// Log error and retry after delay
 				c.updateStats(startTime, false)
@@ -271,8 +307,18 @@ func (c *Client) WatchConfig(namespace, group, key string, callback func(*model.
 			} else if resp.StatusCode == http.StatusNotModified {
 				// Timeout, just retry
 				c.updateStats(startTime, true) // Treat timeout as successful for stats
+			} else if resp.StatusCode == http.StatusUnauthorized {
+				// Token expired, try to refresh
+				c.updateStats(startTime, false)
+				if err := c.RefreshToken(); err == nil {
+					// Refresh successful, continue with next iteration
+					resp.Body.Close()
+					continue
+				}
+				// Refresh failed, retry after longer delay
+				time.Sleep(5 * time.Second)
 			} else {
-				// Error, retry after delay
+				// Other error, retry after delay
 				c.updateStats(startTime, false)
 				time.Sleep(2 * time.Second)
 			}
