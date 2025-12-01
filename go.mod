@@ -1,4 +1,4 @@
-module otter
+module github.com/sotowang/otter
 
 go 1.23.12
 

@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"otter/internal/model"
-	"otter/pkg/client"
+	"github.com/sotowang/otter/pkg/client"
+	"github.com/sotowang/otter/pkg/model"
 )
 
 func main() {

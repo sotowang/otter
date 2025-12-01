@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"otter/internal/model"
+	"github.com/sotowang/otter/internal/model"
 )
 
 var (

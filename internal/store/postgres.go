@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"otter/internal/model"
+	"github.com/sotowang/otter/internal/model"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )

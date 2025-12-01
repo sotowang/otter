@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"otter/internal/model"
+	"github.com/sotowang/otter/pkg/model"
 )
 
 // TestConnectionPoolSingleInstance tests connection pool behavior with a single client instance

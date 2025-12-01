@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"otter/internal/model"
+	"github.com/sotowang/otter/internal/model"
 
 	_ "github.com/mattn/go-sqlite3"
 )

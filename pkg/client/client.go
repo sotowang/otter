@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"otter/internal/model"
+	"github.com/sotowang/otter/pkg/model"
 )
 
 // ClientConfig contains configuration for the client

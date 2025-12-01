@@ -6,8 +6,8 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"otter/internal/server"
-	"otter/internal/store"
+	"github.com/sotowang/otter/internal/server"
+	"github.com/sotowang/otter/internal/store"
 )
 
 func main() {

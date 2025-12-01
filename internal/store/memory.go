@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"otter/internal/model"
+	"github.com/sotowang/otter/internal/model"
 )
 
 // TokenBlacklistEntry represents a token blacklist entry

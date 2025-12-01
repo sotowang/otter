@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"otter/internal/store"
-	"otter/internal/util"
+	"github.com/sotowang/otter/internal/store"
+	"github.com/sotowang/otter/internal/util"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"

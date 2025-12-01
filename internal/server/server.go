@@ -11,9 +11,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"otter/internal/model"
-	"otter/internal/store"
-	"otter/internal/util"
+	"github.com/sotowang/otter/internal/model"
+	"github.com/sotowang/otter/internal/store"
+	"github.com/sotowang/otter/internal/util"
 )
 
 type Watcher struct {
