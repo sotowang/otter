@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  otter:
+    build: .
+    ports:
+      - "8086:8086"
+    environment:
+      - PORT=8086
+      - JWT_SECRET=your-secret-key
+      - DSN=postgres://user:password@localhost:5432/otter?sslmode=disable
+    restart: unless-stopped
+
+  # 可选：如果你想在Docker Compose中包含PostgreSQL服务，可以取消下面的注释
+  # postgres:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     - POSTGRES_DB=otter
+  #     - POSTGRES_USER=otter
+  #     - POSTGRES_PASSWORD=otter_password
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   restart: unless-stopped
+
+# volumes:
+#   postgres_data:

@@ -197,7 +197,14 @@ func (s *Server) setupRoutes() {
 
 	// Serve static files
 	s.engine.StaticFile("/", "./web/index.html")
-	s.engine.Static("/static", "./web/static")
+	s.engine.Static("/assets", "./web/assets")
+	s.engine.StaticFile("/favicon.ico", "./web/favicon.ico")
+	s.engine.StaticFile("/vite.svg", "./web/vite.svg")
+
+	// Handle all other routes by serving index.html (for SPA)
+	s.engine.NoRoute(func(c *gin.Context) {
+		c.File("./web/index.html")
+	})
 
 	// API Routes
 	api := s.engine.Group("/api/v1")
