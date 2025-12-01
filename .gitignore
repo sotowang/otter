@@ -1,3 +1,4 @@
 __debug_*
 .vscode/launch.json
 otter
+.trae/
