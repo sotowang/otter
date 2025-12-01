@@ -184,13 +184,13 @@ const ConfigManagement: React.FC = () => {
   };
 
   return (
-    <>
+    <div className="config-management-container">
+      <h2>Config Management</h2>
       <div className="filters">
         <div className="filter-group">
           <label htmlFor="namespace">Namespace:</label>
           <select
             id="namespace"
-            className="form-control"
             value={namespace}
             onChange={(e) => setNamespace(e.target.value)}
           >
@@ -210,40 +210,34 @@ const ConfigManagement: React.FC = () => {
             onChange={(e) => setGroup(e.target.value)}
           />
         </div>
-        <button onClick={handleLoadConfigs} className="load-btn">
+        <button onClick={handleLoadConfigs} className="btn btn-primary">
           Load Configs
         </button>
       </div>
 
-      <hr />
-
-      <div id="config-management-section" className="content-section">
-        <div id="config-list" className="content-subsection">
-          <div className="card">
-            <div className="card-header">
-              <h3>Configs</h3>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={openCreateConfigModal}
-                  className="save-btn"
-                >
-                  Create Config
-                </button>
-                <button type="button" onClick={openCloneConfigModal} className="save-btn">
-                  Clone Configs
-                </button>
-              </div>
-            </div>
-            <ConfigList
-              configs={configs}
-              isLoading={isLoading}
-              onEdit={openEditConfigModal}
-              onHistory={handleShowHistory}
-              onDelete={handleDeleteConfig}
-            />
+      <div className="configs-section">
+        <div className="configs-header">
+          <h3>Configs</h3>
+          <div className="config-actions">
+            <button
+              type="button"
+              onClick={openCreateConfigModal}
+              className="btn btn-primary"
+            >
+              Create Config
+            </button>
+            <button type="button" onClick={openCloneConfigModal} className="btn btn-primary">
+              Clone Configs
+            </button>
           </div>
         </div>
+        <ConfigList
+          configs={configs}
+          isLoading={isLoading}
+          onEdit={openEditConfigModal}
+          onHistory={handleShowHistory}
+          onDelete={handleDeleteConfig}
+        />
       </div>
 
       {/* 创建/编辑配置模态框 */}
@@ -494,7 +488,7 @@ const ConfigManagement: React.FC = () => {
       </Modal>
 
 
-    </>
+    </div>
   );
 };
 

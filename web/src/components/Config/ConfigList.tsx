@@ -19,9 +19,9 @@ const ConfigList: React.FC<ConfigListProps> = React.memo(
           <tr>
             <td
               colSpan={5}
-              style={{ textAlign: 'center', color: '#999', padding: '40px' }}
+              className="loading"
             >
-              <span className="loading"></span> Loading configs...
+              Loading configs...
             </td>
           </tr>
         );
@@ -32,7 +32,7 @@ const ConfigList: React.FC<ConfigListProps> = React.memo(
           <tr>
             <td
               colSpan={5}
-              style={{ textAlign: 'center', color: '#999', padding: '40px' }}
+              className="no-data"
             >
               No configs found
             </td>
@@ -49,50 +49,30 @@ const ConfigList: React.FC<ConfigListProps> = React.memo(
           try {
             const parsed = JSON.parse(value);
             return (
-              <div style={{ maxHeight: '120px', overflow: 'auto', margin: '0' }}>
-                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0, fontSize: '12px', backgroundColor: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
+              <div className="config-value">
+                <pre className="config-value-json">
                   {JSON.stringify(parsed, null, 2)}
                 </pre>
               </div>
             );
           } catch (e) {
             // 如果JSON解析失败，显示原始值
-            return (
-              <div style={{ maxHeight: '120px', overflow: 'auto', margin: '0' }}>
-                <div style={{ fontSize: '12px', backgroundColor: '#f5f5f5', padding: '8px', borderRadius: '4px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                  {value}
-                </div>
-              </div>
-            );
+            return <div className="config-value">{value}</div>;
           }
         case 'markdown':
           try {
             const html = marked(value);
             return (
-              <div 
-                className="markdown-content" 
-                dangerouslySetInnerHTML={{ __html: html }}
-                style={{ fontSize: '13px', maxHeight: '120px', overflow: 'auto', margin: '0' }}
-              />
+              <div className="config-value markdown-content">
+                <div dangerouslySetInnerHTML={{ __html: html }} />
+              </div>
             );
           } catch (e) {
             // 如果Markdown渲染失败，显示原始值
-            return (
-              <div style={{ maxHeight: '120px', overflow: 'auto', margin: '0' }}>
-                <div style={{ fontSize: '12px', backgroundColor: '#f5f5f5', padding: '8px', borderRadius: '4px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                  {value}
-                </div>
-              </div>
-            );
+            return <div className="config-value">{value}</div>;
           }
         default:
-          return (
-            <div style={{ maxHeight: '120px', overflow: 'auto', margin: '0' }}>
-              <div style={{ fontSize: '12px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                {value}
-              </div>
-            </div>
-          );
+          return <div className="config-value">{value}</div>;
       }
     };
 
@@ -100,19 +80,19 @@ const ConfigList: React.FC<ConfigListProps> = React.memo(
         <tr key={`${cfg.namespace}-${cfg.group}-${cfg.key}`}>
           <td>{cfg.key}</td>
           <td>{renderConfigValue(cfg.value, cfg.type || 'text')}</td>
-          <td>{cfg.type || 'text'}</td>
-          <td>{new Date(cfg.updated_at).toLocaleString()}</td>
-          <td className="actions">
-            <button onClick={() => onEdit(cfg)}>Edit</button>
-            <button onClick={() => onHistory(cfg)}>History</button>
-            <button onClick={() => onDelete(cfg)}>Delete</button>
+          <td><span className="config-type">{cfg.type || 'text'}</span></td>
+          <td className="config-updated-at">{new Date(cfg.updated_at).toLocaleString()}</td>
+          <td className="config-actions-buttons">
+            <button className="btn btn-primary" onClick={() => onEdit(cfg)}>Edit</button>
+            <button className="btn btn-secondary" onClick={() => onHistory(cfg)}>History</button>
+            <button className="btn btn-danger" onClick={() => onDelete(cfg)}>Delete</button>
           </td>
         </tr>
       ));
     }, [configs, isLoading, onEdit, onHistory, onDelete]);
 
     return (
-      <table id="configTable">
+      <table className="config-table">
         <thead>
           <tr>
             <th>Key</th>
