@@ -329,6 +329,27 @@ const ConfigManagement: React.FC = () => {
             >
               Clone Configs
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                const exportData = filteredConfigs.map(cfg => ({
+                  namespace: cfg.namespace,
+                  group: cfg.group,
+                  key: cfg.key,
+                  value: cfg.value
+                }));
+                const jsonData = JSON.stringify(exportData, null, 2);
+                navigator.clipboard.writeText(jsonData).then(() => {
+                  alert('Configs exported to clipboard successfully!');
+                }).catch(err => {
+                  console.error('Failed to export configs:', err);
+                  alert('Failed to export configs to clipboard. Please try again.');
+                });
+              }}
+              className="btn btn-primary"
+            >
+              Export Configs
+            </button>
           </div>
         </div>
         <ConfigList
