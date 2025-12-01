@@ -166,17 +166,26 @@ func (s *Server) Run(addr string) error {
 
 func (s *Server) initAdminUser() {
 	ctx := context.Background()
-	_, err := s.store.GetUser(ctx, "admin")
+	user, err := s.store.GetUser(ctx, "admin")
 	if err == store.ErrNotFound {
-		s.store.CreateUser(ctx, &model.User{
+		// Create admin user if not exists
+		newUser := &model.User{
 			Username:  "admin",
 			Password:  "admin", // Default password
 			Role:      "admin",
 			Status:    "active",
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
-		})
+		}
+		if err := s.store.CreateUser(ctx, newUser); err != nil {
+			s.logger.Error("Failed to create default admin user", zap.Error(err))
+			return
+		}
 		s.logger.Info("Created default admin user", zap.String("username", "admin"), zap.String("password", "admin"))
+	} else if err != nil {
+		s.logger.Error("Failed to check admin user existence", zap.Error(err))
+	} else {
+		s.logger.Info("Admin user already exists", zap.String("username", user.Username))
 	}
 }
 
@@ -608,29 +617,48 @@ func (s *Server) loginHandler(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		s.logger.Warn("Login request with invalid body", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
+	s.logger.Info("Login attempt", zap.String("username", req.Username), zap.String("ip", c.ClientIP()))
+
 	// Get user from store
 	user, err := s.store.GetUser(c.Request.Context(), req.Username)
 	if err != nil {
+		if err == store.ErrNotFound {
+			s.logger.Warn("Login failed: User not found", zap.String("username", req.Username), zap.String("ip", c.ClientIP()))
+		} else {
+			s.logger.Error("Login failed: Database error", zap.String("username", req.Username), zap.Error(err))
+		}
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
 	// Check password (in production, this should be a proper password comparison)
 	if user.Password != req.Password {
+		s.logger.Warn("Login failed: Incorrect password", zap.String("username", req.Username), zap.String("ip", c.ClientIP()))
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		return
+	}
+
+	// Check user status
+	if user.Status != "active" {
+		s.logger.Warn("Login failed: User inactive", zap.String("username", req.Username), zap.String("status", user.Status))
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User account is inactive"})
 		return
 	}
 
 	// Generate JWT tokens
 	accessToken, refreshToken, expiresIn, err := s.generateTokens(req.Username)
 	if err != nil {
+		s.logger.Error("Login failed: Token generation error", zap.String("username", req.Username), zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
 		return
 	}
+
+	s.logger.Info("Login successful", zap.String("username", req.Username), zap.String("ip", c.ClientIP()))
 
 	c.JSON(http.StatusOK, gin.H{
 		"access_token":  accessToken,

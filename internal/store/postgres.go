@@ -21,6 +21,11 @@ func NewPostgresStore(dsn string) (*PostgresStore, error) {
 		return nil, err
 	}
 
+	// Configure connection pool
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
 	if err := db.Ping(); err != nil {
 		return nil, err
 	}
