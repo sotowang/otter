@@ -167,9 +167,25 @@ func (s *Server) Run(addr string) error {
 
 func (s *Server) initAdminUser() {
 	ctx := context.Background()
-	user, err := s.store.GetUser(ctx, "admin")
-	if err == store.ErrNotFound {
-		// Create admin user if not exists
+	
+	// Check if any admin user exists
+	users, err := s.store.ListUsers(ctx)
+	if err != nil {
+		s.logger.Error("Failed to list users", zap.Error(err))
+		return
+	}
+	
+	// Check if there's any admin user
+	adminExists := false
+	for _, user := range users {
+		if user.Role == "admin" {
+			adminExists = true
+			break
+		}
+	}
+	
+	if !adminExists {
+		// Create admin user if no admin exists
 		newUser := &model.User{
 			Username:  "admin",
 			Password:  util.MD5Encrypt("admin"), // Default password encrypted with MD5
@@ -183,10 +199,8 @@ func (s *Server) initAdminUser() {
 			return
 		}
 		s.logger.Info("Created default admin user", zap.String("username", "admin"), zap.String("password", "admin"))
-	} else if err != nil {
-		s.logger.Error("Failed to check admin user existence", zap.Error(err))
 	} else {
-		s.logger.Info("Admin user already exists", zap.String("username", user.Username))
+		s.logger.Info("Admin user already exists, skipping creation")
 	}
 }
 
