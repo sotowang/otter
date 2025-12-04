@@ -845,80 +845,10 @@ func (s *Server) putConfigHandler(c *gin.Context) {
 		configType = "text"
 	}
 
-	// Validate JSON format if type is json
-	if configType == "json" {
-		// Check if value is valid JSON
-		var jsonObj map[string]interface{}
-		if err := json.Unmarshal([]byte(req.Value), &jsonObj); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
-			return
-		}
-
-		// Check for duplicate keys using a custom parser
-		// Standard json.Unmarshal automatically handles duplicates by keeping the last value
-		// So we need to use a custom parser to detect duplicates
-		decoder := json.NewDecoder(strings.NewReader(req.Value))
-		decoder.UseNumber()
-
-		// Check if it's an object
-		token, err := decoder.Token()
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
-			return
-		}
-
-		// Must be an object start
-		if delim, ok := token.(json.Delim); !ok || delim != '{' {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "JSON must be an object"})
-			return
-		}
-
-		// Track keys to detect duplicates
-		keys := make(map[string]bool)
-
-		// Iterate through all key-value pairs
-		for decoder.More() {
-			token, err := decoder.Token()
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
-				return
-			}
-
-			// Must be a string key
-			keyStr, ok := token.(string)
-			if !ok {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "JSON keys must be strings"})
-				return
-			}
-
-			// Check for duplicate key
-			if keys[keyStr] {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "JSON contains duplicate keys"})
-				return
-			}
-			keys[keyStr] = true
-
-			// Skip the value
-			if err := decoder.Decode(&jsonObj); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
-				return
-			}
-		}
-
-		// Must end with object close
-		token, err = decoder.Token()
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
-			return
-		}
-
-		// Check if it's an object end
-		delim, ok := token.(json.Delim)
-		if !ok || delim != '}' {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
-			return
-		}
-	}
+	// 对于JSON类型，不进行任何校验，只接受值
+	// 这样用户可以保存任何格式的JSON配置
+	// 移除了JSON格式、对象类型和重复键的校验逻辑
+	// 让后端接受任何格式的JSON配置
 
 	// Get username from context
 	username := "system"
