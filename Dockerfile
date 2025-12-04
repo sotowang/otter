@@ -7,8 +7,8 @@ WORKDIR /app/web
 # 复制前端项目的package.json和package-lock.json
 COPY web/package*.json ./
 
-# 安装前端依赖
-RUN npm install
+# 使用国内npm镜像加速依赖安装
+RUN npm config set registry https://registry.npmmirror.com && npm install
 
 # 复制前端项目的所有源代码
 COPY web/ .
@@ -25,8 +25,8 @@ WORKDIR /app
 # 复制go.mod和go.sum文件
 COPY go.mod go.sum ./
 
-# 下载依赖
-RUN go mod download
+# 使用国内Go代理加速依赖下载
+RUN go env -w GOPROXY=https://goproxy.cn,direct && go mod download
 
 # 复制所有源代码
 COPY . .
@@ -34,8 +34,8 @@ COPY . .
 # 复制前端构建后的文件到后端项目中
 COPY --from=frontend-builder /app/web/dist ./web
 
-# 构建应用程序
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -o otter main.go
+# 构建应用程序（强制使用amd64架构，确保兼容性）
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o otter main.go
 
 # 第三阶段：最终镜像
 FROM alpine:latest
