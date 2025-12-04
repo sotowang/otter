@@ -778,9 +778,19 @@ body {
   flex-wrap: wrap;
 }
 
+/* 配置表格容器 */
+.config-table-container {
+  overflow-x: auto;
+  width: 100%;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
 /* 配置表格样式 */
 .config-table {
   width: 100%;
+  min-width: 800px;
   border-collapse: collapse;
   background: #fff;
 }
@@ -821,24 +831,99 @@ body {
   border-bottom: none;
 }
 
+/* 配置值包装器 */
+.config-value-wrapper {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+/* 配置值切换按钮 */
+.config-value-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 4px;
+  background: #f0f0f0;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+  user-select: none;
+  margin-top: 8px;
+}
+
+.config-value-toggle:hover {
+  background: #e6f7ff;
+  border-color: #1890ff;
+  color: #1890ff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+}
+
+/* 切换图标 */
+.toggle-icon {
+  font-size: 10px;
+  transition: transform 0.3s ease;
+}
+
 /* 配置值样式 */
 .config-value {
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 400px;
+  overflow: auto;
   font-family: 'Courier New', Courier, monospace;
   background: #fafafa;
   padding: 8px 12px;
   border-radius: 6px;
   border: 1px solid #e8e8e8;
   transition: all 0.3s ease;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.4;
+  font-size: 12px;
+}
+
+/* 折叠状态的配置值 */
+.config-value.collapsed {
+  max-height: 60px;
+  overflow: hidden;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+  border-bottom: 1px dashed #e0e0e0;
+}
+
+/* 展开状态的配置值 */
+.config-value.expanded {
+  max-height: none;
+  overflow: visible;
+  max-width: 600px;
 }
 
 .config-value:hover {
   background: #e6f7ff;
   border-color: #1890ff;
-  transform: scale(1.02);
+}
+
+/* JSON值样式 */
+.config-value-json {
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  max-width: 100%;
+  overflow: auto;
+}
+
+/* 确保pre标签在折叠状态下也能正常显示 */
+.config-value.collapsed pre {
+  max-height: 40px;
+  overflow: hidden;
 }
 
 .config-type {
@@ -1240,7 +1325,26 @@ body {
   }
 
   .config-value {
-    max-width: 150px;
+    max-width: 100%;
+    white-space: pre-wrap;
+    font-size: 11px;
+  }
+
+  .config-value-wrapper {
+    gap: 6px;
+  }
+
+  .config-value-toggle {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+  .config-value.collapsed {
+    max-height: 50px;
+  }
+
+  .config-value.expanded {
+    max-width: 100%;
   }
 
   .config-actions-buttons {
