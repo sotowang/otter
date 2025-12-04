@@ -5,3 +5,4 @@ otter
 main
 docker-compose.override.yml
 deploy.sh
+web/screenshot.png
