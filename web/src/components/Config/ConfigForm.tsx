@@ -35,7 +35,7 @@ const ConfigForm: React.FC<ConfigFormProps> = React.memo(
           try {
             const parsed = JSON.parse(val);
             return JSON.stringify(parsed, null, 2);
-          } catch (e) {
+          } catch {
             // 如果JSON解析失败，返回原始值
             return val;
           }
@@ -80,41 +80,12 @@ const ConfigForm: React.FC<ConfigFormProps> = React.memo(
         return 'Value cannot be empty';
       }
 
+      // 对于JSON类型，不进行任何校验，只检查值是否为空
+      // 这样用户可以保存任何格式的JSON配置
       switch (type) {
         case 'json':
-          try {
-            // 首先检查基本JSON格式
-            const parsed = JSON.parse(val);
-
-            // 检查是否为对象
-            if (typeof parsed !== 'object' || parsed === null) {
-              return 'JSON must be an object';
-            }
-
-            // 检查重复键
-            const keys = new Set<string>();
-            let hasDuplicateKeys = false;
-
-            // 使用正则表达式查找所有键，检查是否有重复
-            const keyRegex = /"([^"]+)":/g;
-            let match;
-            while ((match = keyRegex.exec(val)) !== null) {
-              const key = match[1];
-              if (keys.has(key)) {
-                hasDuplicateKeys = true;
-                break;
-              }
-              keys.add(key);
-            }
-
-            if (hasDuplicateKeys) {
-              return 'JSON contains duplicate keys';
-            }
-
-            return null;
-          } catch (e) {
-            return 'Invalid JSON format';
-          }
+          // 只检查值是否为空，不进行其他校验
+          return null;
         default:
           return null;
       }
@@ -211,7 +182,13 @@ const ConfigForm: React.FC<ConfigFormProps> = React.memo(
         <div className="form-row">
           <div className="form-group">
             <label htmlFor="value">Value:</label>
-            <div style={error ? { border: '1px solid #ff4d4f', borderRadius: '4px' } : {}}>
+            <div
+              style={
+                error
+                  ? { border: '1px solid #ff4d4f', borderRadius: '4px' }
+                  : {}
+              }
+            >
               <CodeMirror
                 value={value}
                 height="400px"

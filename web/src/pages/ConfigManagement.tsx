@@ -224,9 +224,9 @@ const ConfigManagement: React.FC = () => {
     if (searchKey.trim() === '') {
       return configs;
     }
-    
+
     const key = searchKey.trim();
-    return configs.filter(config => {
+    return configs.filter((config) => {
       if (isPrefixMatch) {
         return config.key.startsWith(key);
       } else {
@@ -289,10 +289,7 @@ const ConfigManagement: React.FC = () => {
           </div>
         </div>
         <div className="search-actions">
-          <button
-            onClick={handleSearch}
-            className="btn btn-primary search-btn"
-          >
+          <button onClick={handleSearch} className="btn btn-primary search-btn">
             Search
           </button>
           <button
@@ -332,19 +329,24 @@ const ConfigManagement: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                const exportData = filteredConfigs.map(cfg => ({
+                const exportData = filteredConfigs.map((cfg) => ({
                   namespace: cfg.namespace,
                   group: cfg.group,
                   key: cfg.key,
-                  value: cfg.value
+                  value: cfg.value,
                 }));
                 const jsonData = JSON.stringify(exportData, null, 2);
-                navigator.clipboard.writeText(jsonData).then(() => {
-                  alert('Configs exported to clipboard successfully!');
-                }).catch(err => {
-                  console.error('Failed to export configs:', err);
-                  alert('Failed to export configs to clipboard. Please try again.');
-                });
+                navigator.clipboard
+                  .writeText(jsonData)
+                  .then(() => {
+                    alert('Configs exported to clipboard successfully!');
+                  })
+                  .catch((err) => {
+                    console.error('Failed to export configs:', err);
+                    alert(
+                      'Failed to export configs to clipboard. Please try again.'
+                    );
+                  });
               }}
               className="btn btn-primary"
             >

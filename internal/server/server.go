@@ -17,41 +17,63 @@ import (
 )
 
 type Watcher struct {
-	subscribers sync.Map // map[string][]chan *model.Config (key: namespace/group/key)
+	mu          sync.Mutex
+	subscribers map[string]map[chan *model.Config]struct{} // key: namespace/group/key
 }
 
 func NewWatcher() *Watcher {
-	return &Watcher{}
+	return &Watcher{
+		subscribers: make(map[string]map[chan *model.Config]struct{}),
+	}
 }
 
-func (w *Watcher) Subscribe(namespace, group, key string) chan *model.Config {
+func (w *Watcher) Subscribe(namespace, group, key string) (chan *model.Config, func()) {
 	ch := make(chan *model.Config, 1)
 	fullKey := namespace + "/" + group + "/" + key
 
-	val, _ := w.subscribers.LoadOrStore(fullKey, []chan *model.Config{})
-	subs := val.([]chan *model.Config)
-	subs = append(subs, ch)
-	w.subscribers.Store(fullKey, subs)
+	w.mu.Lock()
+	if _, ok := w.subscribers[fullKey]; !ok {
+		w.subscribers[fullKey] = make(map[chan *model.Config]struct{})
+	}
+	w.subscribers[fullKey][ch] = struct{}{}
+	w.mu.Unlock()
 
-	return ch
+	unsubscribe := func() {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+
+		subs, ok := w.subscribers[fullKey]
+		if !ok {
+			return
+		}
+
+		delete(subs, ch)
+		if len(subs) == 0 {
+			delete(w.subscribers, fullKey)
+		}
+	}
+
+	return ch, unsubscribe
 }
 
 func (w *Watcher) Notify(config *model.Config) {
 	fullKey := config.Namespace + "/" + config.Group + "/" + config.Key
-	val, ok := w.subscribers.Load(fullKey)
+
+	w.mu.Lock()
+	subs, ok := w.subscribers[fullKey]
 	if !ok {
+		w.mu.Unlock()
 		return
 	}
+	delete(w.subscribers, fullKey)
+	w.mu.Unlock()
 
-	subs := val.([]chan *model.Config)
-	for _, ch := range subs {
+	for ch := range subs {
 		select {
 		case ch <- config:
 		default:
 		}
 	}
-	// Clear subscribers after notification (one-time trigger for long polling)
-	w.subscribers.Delete(fullKey)
 }
 
 // ConnectionStats contains connection statistics for the server
@@ -366,7 +388,8 @@ func (s *Server) handleConfigs(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) watchConfig(w http.ResponseWriter, r *http.Request, namespace, group, key string) {
 	// Long polling: wait for update or timeout
-	ch := s.watcher.Subscribe(namespace, group, key)
+	ch, unsubscribe := s.watcher.Subscribe(namespace, group, key)
+	defer unsubscribe()
 
 	select {
 	case cfg := <-ch:
@@ -845,80 +868,10 @@ func (s *Server) putConfigHandler(c *gin.Context) {
 		configType = "text"
 	}
 
-	// Validate JSON format if type is json
-	if configType == "json" {
-		// Check if value is valid JSON
-		var jsonObj map[string]interface{}
-		if err := json.Unmarshal([]byte(req.Value), &jsonObj); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
-			return
-		}
-
-		// Check for duplicate keys using a custom parser
-		// Standard json.Unmarshal automatically handles duplicates by keeping the last value
-		// So we need to use a custom parser to detect duplicates
-		decoder := json.NewDecoder(strings.NewReader(req.Value))
-		decoder.UseNumber()
-
-		// Check if it's an object
-		token, err := decoder.Token()
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
-			return
-		}
-
-		// Must be an object start
-		if delim, ok := token.(json.Delim); !ok || delim != '{' {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "JSON must be an object"})
-			return
-		}
-
-		// Track keys to detect duplicates
-		keys := make(map[string]bool)
-
-		// Iterate through all key-value pairs
-		for decoder.More() {
-			token, err := decoder.Token()
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
-				return
-			}
-
-			// Must be a string key
-			keyStr, ok := token.(string)
-			if !ok {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "JSON keys must be strings"})
-				return
-			}
-
-			// Check for duplicate key
-			if keys[keyStr] {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "JSON contains duplicate keys"})
-				return
-			}
-			keys[keyStr] = true
-
-			// Skip the value
-			if err := decoder.Decode(&jsonObj); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
-				return
-			}
-		}
-
-		// Must end with object close
-		token, err = decoder.Token()
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
-			return
-		}
-
-		// Check if it's an object end
-		delim, ok := token.(json.Delim)
-		if !ok || delim != '}' {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
-			return
-		}
-	}
+	// 对于JSON类型，不进行任何校验，只接受值
+	// 这样用户可以保存任何格式的JSON配置
+	// 移除了JSON格式、对象类型和重复键的校验逻辑
+	// 让后端接受任何格式的JSON配置
 
 	// Get username from context
 	username := "system"
@@ -1002,7 +955,8 @@ func (s *Server) watchConfigHandler(c *gin.Context) {
 	key := c.Param("key")
 
 	// Long polling: wait for update or timeout
-	ch := s.watcher.Subscribe(namespace, group, key)
+	ch, unsubscribe := s.watcher.Subscribe(namespace, group, key)
+	defer unsubscribe()
 
 	select {
 	case cfg := <-ch:
