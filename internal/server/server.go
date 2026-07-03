@@ -17,41 +17,63 @@ import (
 )
 
 type Watcher struct {
-	subscribers sync.Map // map[string][]chan *model.Config (key: namespace/group/key)
+	mu          sync.Mutex
+	subscribers map[string]map[chan *model.Config]struct{} // key: namespace/group/key
 }
 
 func NewWatcher() *Watcher {
-	return &Watcher{}
+	return &Watcher{
+		subscribers: make(map[string]map[chan *model.Config]struct{}),
+	}
 }
 
-func (w *Watcher) Subscribe(namespace, group, key string) chan *model.Config {
+func (w *Watcher) Subscribe(namespace, group, key string) (chan *model.Config, func()) {
 	ch := make(chan *model.Config, 1)
 	fullKey := namespace + "/" + group + "/" + key
 
-	val, _ := w.subscribers.LoadOrStore(fullKey, []chan *model.Config{})
-	subs := val.([]chan *model.Config)
-	subs = append(subs, ch)
-	w.subscribers.Store(fullKey, subs)
+	w.mu.Lock()
+	if _, ok := w.subscribers[fullKey]; !ok {
+		w.subscribers[fullKey] = make(map[chan *model.Config]struct{})
+	}
+	w.subscribers[fullKey][ch] = struct{}{}
+	w.mu.Unlock()
 
-	return ch
+	unsubscribe := func() {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+
+		subs, ok := w.subscribers[fullKey]
+		if !ok {
+			return
+		}
+
+		delete(subs, ch)
+		if len(subs) == 0 {
+			delete(w.subscribers, fullKey)
+		}
+	}
+
+	return ch, unsubscribe
 }
 
 func (w *Watcher) Notify(config *model.Config) {
 	fullKey := config.Namespace + "/" + config.Group + "/" + config.Key
-	val, ok := w.subscribers.Load(fullKey)
+
+	w.mu.Lock()
+	subs, ok := w.subscribers[fullKey]
 	if !ok {
+		w.mu.Unlock()
 		return
 	}
+	delete(w.subscribers, fullKey)
+	w.mu.Unlock()
 
-	subs := val.([]chan *model.Config)
-	for _, ch := range subs {
+	for ch := range subs {
 		select {
 		case ch <- config:
 		default:
 		}
 	}
-	// Clear subscribers after notification (one-time trigger for long polling)
-	w.subscribers.Delete(fullKey)
 }
 
 // ConnectionStats contains connection statistics for the server
@@ -366,7 +388,8 @@ func (s *Server) handleConfigs(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) watchConfig(w http.ResponseWriter, r *http.Request, namespace, group, key string) {
 	// Long polling: wait for update or timeout
-	ch := s.watcher.Subscribe(namespace, group, key)
+	ch, unsubscribe := s.watcher.Subscribe(namespace, group, key)
+	defer unsubscribe()
 
 	select {
 	case cfg := <-ch:
@@ -932,7 +955,8 @@ func (s *Server) watchConfigHandler(c *gin.Context) {
 	key := c.Param("key")
 
 	// Long polling: wait for update or timeout
-	ch := s.watcher.Subscribe(namespace, group, key)
+	ch, unsubscribe := s.watcher.Subscribe(namespace, group, key)
+	defer unsubscribe()
 
 	select {
 	case cfg := <-ch:
